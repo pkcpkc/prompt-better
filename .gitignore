@@ -1,0 +1,71 @@
+# macOS
+.DS_Store
+**/.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+*.icloud
+
+# Gradle
+.gradle/
+.gradle-home/
+build/
+**/build/
+
+# Xcode & Swift
+AIBridges/iOS/iosAIBridge.xcodeproj/
+AIBridges/iOS/iosAIBridge.xcworkspace/
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+*.xcresult
+*.xcuserstate
+xcuserdata/
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*~.nib
+*.generated.xcconfig
+Pods/
+.swiftpm/
+.build/
+build_output/
+
+# IDE / Editors
+.idea/
+*.iml
+.vscode/
+*.swp
+*~
+
+# Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+__pycache__/
+dist/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.pyre/
+
+# Generated Artifacts
+Generated/
+prompts/ios/prompts/*/results/
+
+# Generated JS bundles
+iosApp/ResearchShare/Action.js
+iosApp/iosApp/Resources/Action.js
+
+# Local Configs & Credentials
+local.properties
+.env
+.env.*
+*.env
+.prompt_better_cache.db
+
+
+

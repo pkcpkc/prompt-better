@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Prompt Definition",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for the prompt."
+    },
+    "instructions": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "description": "The system instructions or template for the model."
+        },
+        "context": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/definitions/fieldDefinition" },
+              {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" }
+                },
+                "required": ["name"]
+              }
+            ]
+          }
+        }
+      },
+      "required": ["prompt", "context"]
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "model_id": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "top_p": {
+          "type": "number"
+        },
+        "top_k": {
+          "type": "integer"
+        },
+        "max_tokens": {
+          "type": "integer"
+        },
+        "stop_sequences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          { "$ref": "#/definitions/fieldDefinition" },
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            },
+            "required": ["name"]
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "name",
+    "instructions",
+    "outputs"
+  ],
+  "definitions": {
+    "fieldDefinition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "array"]
+        },
+        "items": {
+          "type": "string",
+          "description": "Type of items in case of an array (usually 'string')."
+        },
+        "min_count": {
+          "type": "integer"
+        },
+        "max_count": {
+          "type": "integer"
+        },
+        "desc": {
+          "type": "string",
+          "description": "Description of the field's purpose."
+        }
+      },
+      "required": ["type", "desc"]
+    }
+  }
+}

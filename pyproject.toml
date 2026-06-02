@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-better"
+version = "0.1.0"
+description = "DSPy-based prompt optimization prompts."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Paul Hackenberger", email = "paul.hackenberger@gmail.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "dspy>=2.6.0",
+    "openai>=1.50.0",
+    "pydantic>=2.0.0",
+    "Jinja2>=3.1.0",
+    "beautifulsoup4>=4.12.0",
+    "requests>=2.31.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/pkcpkc/prompt-better"
+"Bug Tracker" = "https://github.com/pkcpkc/prompt-better/issues"
+
+[project.scripts]
+prompt-optimize = "prompt_better.cli:main"
+
+[tool.setuptools]
+packages = ["prompt_better"]
+
+[tool.setuptools.package-data]
+prompt_better = ["templates/*", "prompt-schema.json"]
+
+
