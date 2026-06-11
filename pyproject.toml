@@ -49,4 +49,24 @@ packages = [
 "prompt_better.dataset_manager" = ["dataset-schema.json", "golden-schema.json"]
 "prompt_better.dspy_manager" = ["templates/*"]
 
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+
 

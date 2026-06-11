@@ -305,7 +305,7 @@ def create_openai_client(config: EndpointConfig):
         from openai import OpenAI
     except ModuleNotFoundError as exc:
         raise StructuredOutputError(
-            "The `openai` Python package is not installed. Run `./gradlew promptOptimizationInstall` first."
+            "The `openai` Python package is not installed. Install it via pip or uv (e.g., `uv pip install openai` or `pip install openai`)."
         ) from exc
 
     api_key = config.api_key

@@ -73,7 +73,7 @@ def optimize_prompt(config: OptimizationConfig) -> Dict[str, Any]:
         import dspy
     except ModuleNotFoundError as exc:
         raise PromptOptimizationError(
-            "DSPy is not installed. Run `./gradlew promptOptimizationInstall` first."
+            "DSPy is not installed. Install the package dependencies (e.g., `uv pip install -e .` or `pip install -e .`)."
         ) from exc
 
     specs = load_prompt_specs(config.prompts_dir)
@@ -224,7 +224,7 @@ def _jinja_env():
         from jinja2 import Environment, FileSystemLoader, select_autoescape
     except ModuleNotFoundError as exc:
         raise PromptOptimizationError(
-            "Jinja2 is not installed. Run `./gradlew promptOptimizationInstall` first."
+            "Jinja2 is not installed. Install the package dependencies (e.g., `uv pip install -e .` or `pip install -e .`)."
         ) from exc
 
     templates_dir = Path(__file__).parent / "templates"

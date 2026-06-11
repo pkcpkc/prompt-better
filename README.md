@@ -538,11 +538,10 @@ python3 -m prompt_better.cli optimize \
 ```
 
 ### Gradle Pipeline Reference
-For developers using Gradle, wrapper tasks are available in `build.gradle.kts`:
-*   `./gradlew list`: Show prompt lists.
-*   `./gradlew validate -PpromptOptimizationPrompt=<Name>`: Validate the given prompt.
-*   `./gradlew optimize -PpromptOptimizationPrompt=<Name>`: Run MIPROv2 optimizer.
-*   `./gradlew generateSwiftPrompts`: Make Swift files.
+
+For developers using Gradle (e.g., Android, iOS, or Kotlin Multiplatform projects), a generic, reusable Gradle script plugin helper is available in [contrib/gradle/](contrib/gradle/):
+*   Refer to the [contrib/gradle/README.md](contrib/gradle/README.md) for setup and integration instructions.
+*   Once integrated, tasks like `promptBetterList`, `promptBetterValidate`, `promptBetterOptimize`, and `promptBetterGenerateSwift` will be available in your project's Gradle build pipeline.
 
 ### iOS Integration Setup (`AIPromptCore`)
 See [AIPromptCore Framework](frameworks/AIPromptCore) for details.
