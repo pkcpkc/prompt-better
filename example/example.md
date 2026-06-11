@@ -75,7 +75,7 @@ Best for validating prompts directly on a physical iOS device or simulator to en
 
 ## 4. Configuration & API Credentials
 
-Settings are defined in [example/prompt-better.json](file:///Users/pkc/Projects/prompt-better/example/prompt-better.json). It targets our local student model while referencing a cloud-based teacher model (e.g., GPT-4o) for proposing instructions and grading results:
+Settings are defined in [example/prompt-better.json](prompt-better.json). It targets our local student model while referencing a cloud-based teacher model (e.g., GPT-4o) for proposing instructions and grading results:
 
 ```json
 {

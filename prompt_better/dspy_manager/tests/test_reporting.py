@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from prompt_better.dspy_manager.optimizer import _print_report_summary, _get_baseline_eval_results
+from prompt_better.dspy_manager.reporter import print_report_summary as _print_report_summary
+from prompt_better.dspy_manager.optimizer import _get_baseline_eval_results
 from prompt_better.dspy_manager.models import OptimizationConfig, EndpointConfig
 
 

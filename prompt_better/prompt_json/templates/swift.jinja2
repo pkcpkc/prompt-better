@@ -16,7 +16,7 @@ struct {{ spec.name }}: GenerableWithPrompt {
 
 {% for field in spec.outputs %}
     @Guide(description: "{{ field.desc }}"{% if field.min_count is not none and field.min_count == field.max_count %}, .count({{ field.min_count }}){% endif %})
-    var {{ field.name }}: {{ field.swift_type }}
+    var {{ field.name }}: {{ field | swift_type }}
 {% endfor %}
 
     static let systemPrompt = """

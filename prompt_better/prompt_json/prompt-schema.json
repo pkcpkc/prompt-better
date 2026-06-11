@@ -40,6 +40,9 @@
         },
         "author": {
           "type": "string"
+        },
+        "eval_system_prompt": {
+          "type": "string"
         }
       }
     },

@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-from prompt_better.cli import _build_runtime_config
+from prompt_better.config import build_runtime_config as _build_runtime_config
 from prompt_better.dspy_manager import EndpointConfig
 
 class MockArgs:

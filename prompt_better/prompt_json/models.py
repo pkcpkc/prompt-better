@@ -31,26 +31,6 @@ class PromptFieldSpec(BaseModel):
             return self.min_count
         return None
 
-    def _to_swift_primitive(self, t: str) -> str:
-        t_low = t.lower() if t else ""
-        if t_low == "integer":
-            return "Int"
-        if t_low in ("number", "float", "double"):
-            return "Double"
-        if t_low == "boolean":
-            return "Bool"
-        return "String"
-
-    def _to_python_primitive(self, t: str) -> str:
-        t_low = t.lower() if t else ""
-        if t_low == "integer":
-            return "int"
-        if t_low in ("number", "float", "double"):
-            return "float"
-        if t_low == "boolean":
-            return "bool"
-        return "str"
-
     def _to_json_schema_type(self, t: str) -> str:
         t_low = t.lower() if t else ""
         if t_low == "integer":
@@ -60,18 +40,6 @@ class PromptFieldSpec(BaseModel):
         if t_low == "boolean":
             return "boolean"
         return "string"
-
-    @property
-    def swift_type(self) -> str:
-        if self.is_array:
-            return f"[{self._to_swift_primitive(self.items or 'string')}]"
-        return self._to_swift_primitive(self.type)
-
-    @property
-    def python_type_name(self) -> str:
-        if self.is_array:
-            return f"list[{self._to_python_primitive(self.items or 'string')}]"
-        return self._to_python_primitive(self.type)
 
     def to_json_schema_property(self) -> Dict[str, Any]:
         if self.is_array:
@@ -91,8 +59,13 @@ class PromptFieldSpec(BaseModel):
 
 
 class PromptMetadata(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     version: str = "0.1.0"
     author: str = "Paul"
+    eval_system_prompt: Optional[str] = None
+    structural_weight: Optional[float] = None
+    similarity_weight: Optional[float] = None
 
 
 class PromptConfig(BaseModel):

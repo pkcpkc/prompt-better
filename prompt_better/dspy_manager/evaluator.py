@@ -16,6 +16,8 @@ class BaseEvaluator:
     
     Users can subclass this to customize structural, similarity, teacher, or aggregate scoring.
     """
+    structural_weight: float = 0.55
+    similarity_weight: float = 0.45
 
     def structural_score(self, spec: Any, candidate: Dict[str, Any]) -> float:
         """Calculate structural adherence score (between 0.0 and 1.0)."""
@@ -76,13 +78,24 @@ class BaseEvaluator:
             },
         }
         history_messages = resolve_history_messages(example, specs)
+        
+        # Resolve dynamic evaluation system prompt from metadata or environment
+        import os
+        eval_system_prompt = None
+        if hasattr(spec, "metadata") and spec.metadata is not None:
+            eval_system_prompt = getattr(spec.metadata, "eval_system_prompt", None)
+        if not eval_system_prompt:
+            eval_system_prompt = os.getenv("PROMPT_BETTER_EVAL_SYSTEM_PROMPT")
+        if not eval_system_prompt:
+            eval_system_prompt = (
+                "You are a helpful and precise assistant evaluating structured outputs from language models. "
+                "Grade the output's accuracy, format adherence, and overall quality based on the input, description, and rubric."
+            )
+            
         judge_messages = [
             {
                 "role": "system",
-                "content": (
-                    "Du bewertest strukturierte Ausgaben fuer eine deutsche Nachrichten-App. "
-                    "Bewerte journalistische Relevanz, Genauigkeit, Format-Treue und Hilfsbereitschaft."
-                ),
+                "content": eval_system_prompt,
             },
             {
                 "role": "user",
@@ -128,20 +141,34 @@ class BaseEvaluator:
         teacher_score: float,
     ) -> float:
         """Combine structural, similarity, and teacher scores into a single aggregate score."""
+        struct_w, sim_w = self._get_weights(spec)
         if similarity == 0.0:
             aggregate = 0.0
         else:
-            aggregate = (0.55 * structural) + (0.45 * similarity)
+            aggregate = (struct_w * structural) + (sim_w * similarity)
         
         return (aggregate + teacher_score) / 2
 
     def dspy_score(self, spec: Any, reference: Dict[str, Any], candidate: Dict[str, Any]) -> float:
         """Calculate the scoring function used inside DSPy metric."""
+        struct_w, sim_w = self._get_weights(spec)
         structural = self.structural_score(spec, candidate)
         similarity = self.similarity_score(spec, reference, candidate)
         if similarity == 0.0:
             return 0.0
-        return (0.55 * structural) + (0.45 * similarity)
+        return (struct_w * structural) + (sim_w * similarity)
+
+    def _get_weights(self, spec: Any) -> Tuple[float, float]:
+        struct_w = getattr(self, "structural_weight", 0.55)
+        sim_w = getattr(self, "similarity_weight", 0.45)
+        if hasattr(spec, "metadata") and spec.metadata is not None:
+            cfg_struct = getattr(spec.metadata, "structural_weight", None)
+            cfg_sim = getattr(spec.metadata, "similarity_weight", None)
+            if cfg_struct is not None:
+                struct_w = float(cfg_struct)
+            if cfg_sim is not None:
+                sim_w = float(cfg_sim)
+        return struct_w, sim_w
 
     def _average(self, values: Iterable[Optional[float]]) -> float:
         usable = [float(value) for value in values if value is not None]

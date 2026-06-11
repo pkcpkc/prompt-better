@@ -27,7 +27,8 @@
   ],
   "metadata": {
     "version": "1.0.0",
-    "author": "Paul Hackenberger"
+    "author": "Paul Hackenberger",
+    "eval_system_prompt": "Du bewertest strukturierte Ausgaben fuer eine deutsche Nachrichten-App. Bewerte journalistische Relevanz, Genauigkeit, Format-Treue und Hilfsbereitschaft."
   },
   "config": {
     "model_id": "base",

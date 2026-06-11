@@ -15,12 +15,14 @@ def generate_from_json(source: Path, target: Path, template_path: Path) -> None:
         if not template_path.is_absolute():
             template_path = Path.cwd() / template_path
         template_dir = template_path.parent
+        from .codegen import swift_type_filter
         env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(template_dir),
             trim_blocks=True,
             lstrip_blocks=True,
             keep_trailing_newline=True,
         )
+        env.filters["swift_type"] = swift_type_filter
         template = env.get_template(template_path.name)
 
         # Render

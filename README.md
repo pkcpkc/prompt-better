@@ -31,7 +31,7 @@ This allows the optimization engine to tune prompts directly for the specific ha
 
 ## 2. Short Example for Optimize
 
-Follow these steps to optimize instructions for the sample `TopicClassifierPrompt`.
+Follow these steps to optimize instructions for the sample `TopicClassifierPrompt`. A concrete reference implementation can be found in the [example/](example/) folder, which contains the [TopicClassifier](example/prompts/TopicClassifier) example prompt specification, its dataset, and automated scripts.
 
 ### Step 1: Set Up Python Environment
 Install `prompt-better` in editable mode using `uv` and trust python runtimes configured in `mise.toml`:
@@ -368,7 +368,7 @@ Defines the name, model configs, dynamic placeholders (context), and structured 
   "required": ["name", "instructions", "outputs"]
 }
 ```
-*   **Example Specification**:
+*   **Example Specification**: [prompt.json](example/prompts/TopicClassifier/prompt.json)
 ```json
 {
   "name": "TopicClassifierPrompt",
@@ -435,7 +435,7 @@ Defines the inputs mapped to prompt placeholders, and optional conversation hist
   "required": ["inputs"]
 }
 ```
-*   **Example Payload** (`dataset/case1.json`):
+*   **Example Payload** (`dataset/case1.json`): [dataset/case1.json](example/prompts/TopicClassifier/dataset/case1.json)
 ```json
 {
   "id": "case1",
@@ -472,7 +472,7 @@ Defines expected ground truth values and human-written grading rubrics.
   "required": ["reference_output"]
 }
 ```
-*   **Example Payload** (`golden-truth/case1.json`):
+*   **Example Payload** (`golden-truth/case1.json`): [golden-truth/case1.json](example/prompts/TopicClassifier/golden-truth/case1.json)
 ```json
 {
   "reference_output": {

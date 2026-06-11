@@ -12,6 +12,8 @@ sys.path.insert(0, str(ROOT))
 from prompt_better.dspy_manager.openai_structured import (
     coerce_types_to_schema,
     find_and_parse_json,
+)
+from prompt_better.dspy_manager.fallbacks import (
     FALLBACK_EXTRACTORS,
     register_fallback_extractor,
 )

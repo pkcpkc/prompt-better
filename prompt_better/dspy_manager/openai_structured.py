@@ -12,149 +12,6 @@ class StructuredOutputError(RuntimeError):
     """Raised when a structured output response cannot be parsed."""
 
 
-# MARK: - Pluggable Fallback Extractors Registry
-
-FALLBACK_EXTRACTORS = {}
-
-def register_fallback_extractor(name: str):
-    def decorator(func):
-        FALLBACK_EXTRACTORS[name] = func
-        return func
-    return decorator
-
-
-# MARK: - Generic JSON Recoverer
-
-def find_and_parse_json(content: str) -> Optional[Dict[str, Any]]:
-    """Detects and parses JSON object or list enclosed in text, handling markdown blocks."""
-    content_clean = content.strip()
-    
-    # 1. Clean markdown code blocks if present
-    if "```" in content_clean:
-        match = re.search(r'```(?:json)?\s*(.*?)\s*```', content_clean, re.DOTALL)
-        if match:
-            candidate = match.group(1).strip()
-            try:
-                obj = json.loads(candidate)
-                if isinstance(obj, (dict, list)):
-                    return obj if isinstance(obj, dict) else {"items": obj}
-            except Exception:
-                pass
-
-    # 2. Match outer curly braces for objects
-    start_idx = content_clean.find('{')
-    end_idx = content_clean.rfind('}')
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        candidate = content_clean[start_idx:end_idx+1]
-        try:
-            obj = json.loads(candidate)
-            if isinstance(obj, dict):
-                return obj
-        except Exception:
-            pass
-
-    # 3. Match outer square brackets for arrays
-    start_idx = content_clean.find('[')
-    end_idx = content_clean.rfind(']')
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        candidate = content_clean[start_idx:end_idx+1]
-        try:
-            obj = json.loads(candidate)
-            if isinstance(obj, list):
-                return {"items": obj}
-        except Exception:
-            pass
-
-    return None
-
-
-# MARK: - Specific Legacy Fallback Parsers (Registered)
-
-@register_fallback_extractor("article_insight")
-def extract_article_insight(content: str, properties: Dict[str, Any]) -> Dict[str, Any]:
-    lines = [line.strip() for line in content.splitlines() if line.strip()]
-    summary_parts = []
-    questions = []
-    for line in lines:
-        if re.match(r'^(\d+[\.\)]|[\-\*\u2022])\s+', line) or (line and line[0].isdigit() and (line.startswith("1") or line.startswith("2") or line.startswith("3") or line.startswith("4")) and "." in line[:3]):
-            clean_line = re.sub(r'^(\d+[\.\)]|[\-\*\u2022])\s+', '', line).strip()
-            if clean_line == line:
-                clean_line = re.sub(r'^\d+\.\s*', '', line).strip()
-            questions.append(clean_line)
-        else:
-            summary_parts.append(line)
-    return {
-        "summary": "\n".join(summary_parts),
-        "questions": questions
-    }
-
-
-@register_fallback_extractor("follow_up")
-def extract_follow_up(content: str, properties: Dict[str, Any]) -> Dict[str, Any]:
-    result = {}
-    paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
-    if not paragraphs:
-        paragraphs = [line.strip() for line in content.splitlines() if line.strip()]
-    if len(paragraphs) >= 2:
-        result["answer"] = "\n\n".join(paragraphs[:-1])
-        result["followUpQuestion"] = paragraphs[-1]
-    elif len(paragraphs) == 1:
-        text = paragraphs[0]
-        sentences = re.split(r'(?<=[.!?])\s+', text)
-        if len(sentences) >= 2 and sentences[-1].endswith("?"):
-            result["answer"] = " ".join(sentences[:-1])
-            result["followUpQuestion"] = sentences[-1]
-        else:
-            result["answer"] = text
-            result["followUpQuestion"] = ""
-    else:
-        result["answer"] = ""
-        result["followUpQuestion"] = ""
-    return result
-
-
-@register_fallback_extractor("teacher_grade")
-def extract_teacher_grade(content: str, properties: Dict[str, Any]) -> Dict[str, Any]:
-    score_val = 0.0
-    score_match = re.search(r'(?:score|Score|Bewertung|Note)\s*[:=]\s*("?0?\.\d+|"?1\.0|"?1|"?0)\b', content)
-    if score_match:
-        try:
-            score_val = float(score_match.group(1).replace('"', ''))
-        except ValueError:
-            pass
-    else:
-        floats = re.findall(r'\b(0\.\d+|1\.0|0|1)\b', content)
-        if floats:
-            try:
-                score_val = float(floats[0])
-            except ValueError:
-                pass
-    
-    lines = [line for line in content.splitlines() if not re.search(r'^\s*(?:score|Score|Bewertung|Note)\s*[:=]', line)]
-    rationale_val = "\n".join(lines).strip()
-    return {
-        "score": score_val,
-        "rationale": rationale_val
-    }
-
-
-@register_fallback_extractor("single_array")
-def extract_single_array(content: str, properties: Dict[str, Any]) -> Dict[str, Any]:
-    prop_keys = list(properties.keys())
-    if not prop_keys:
-        return {}
-    key = prop_keys[0]
-    lines = [line.strip() for line in content.splitlines() if line.strip()]
-    items = []
-    for line in lines:
-        clean_line = re.sub(r'^(\d+[\.\)]|[\-\*\u2022])\s+', '', line).strip()
-        if "," in clean_line and len(lines) == 1:
-            items.extend([x.strip() for x in clean_line.split(",") if x.strip()])
-        else:
-            items.append(clean_line)
-    return {key: items}
-
-
 # MARK: - Type Coercion Engine
 
 def coerce_types_to_schema(data: Any, json_schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -239,6 +96,49 @@ def coerce_types_to_schema(data: Any, json_schema: Dict[str, Any]) -> Dict[str, 
     return coerced
 
 
+def find_and_parse_json(content: str) -> Optional[Dict[str, Any]]:
+    """Detects and parses JSON object or list enclosed in text, handling markdown blocks."""
+    content_clean = content.strip()
+    
+    # 1. Clean markdown code blocks if present
+    if "```" in content_clean:
+        match = re.search(r'```(?:json)?\s*(.*?)\s*```', content_clean, re.DOTALL)
+        if match:
+            candidate = match.group(1).strip()
+            try:
+                obj = json.loads(candidate)
+                if isinstance(obj, (dict, list)):
+                    return obj if isinstance(obj, dict) else {"items": obj}
+            except Exception:
+                pass
+
+    # 2. Match outer curly braces for objects
+    start_idx = content_clean.find('{')
+    end_idx = content_clean.rfind('}')
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        candidate = content_clean[start_idx:end_idx+1]
+        try:
+            obj = json.loads(candidate)
+            if isinstance(obj, dict):
+                return obj
+        except Exception:
+            pass
+
+    # 3. Match outer square brackets for arrays
+    start_idx = content_clean.find('[')
+    end_idx = content_clean.rfind(']')
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        candidate = content_clean[start_idx:end_idx+1]
+        try:
+            obj = json.loads(candidate)
+            if isinstance(obj, list):
+                return {"items": obj}
+        except Exception:
+            pass
+
+    return None
+
+
 # MARK: - Fallback Entry Point
 
 def try_parse_raw_text_to_schema(content: str, json_schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -256,23 +156,10 @@ def try_parse_raw_text_to_schema(content: str, json_schema: Dict[str, Any]) -> D
     if not properties:
         raise ValueError("No properties found in schema")
         
-    prop_keys = list(properties.keys())
-    
     # 3. Handle specific layouts with clean registries
-    if set(prop_keys) == {"summary", "questions"}:
-        extracted = FALLBACK_EXTRACTORS["article_insight"](content, properties)
-        return coerce_types_to_schema(extracted, json_schema)
-        
-    if set(prop_keys) == {"answer", "followUpQuestion"}:
-        extracted = FALLBACK_EXTRACTORS["follow_up"](content, properties)
-        return coerce_types_to_schema(extracted, json_schema)
-
-    if set(prop_keys) == {"score", "rationale"}:
-        extracted = FALLBACK_EXTRACTORS["teacher_grade"](content, properties)
-        return coerce_types_to_schema(extracted, json_schema)
-
-    if len(prop_keys) == 1 and properties[prop_keys[0]].get("type") == "array":
-        extracted = FALLBACK_EXTRACTORS["single_array"](content, properties)
+    from .fallbacks import try_parse_fallback
+    extracted = try_parse_fallback(content, properties)
+    if extracted is not None:
         return coerce_types_to_schema(extracted, json_schema)
 
     # 4. Standard light primitive fallback loop

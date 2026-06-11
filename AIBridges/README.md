@@ -152,7 +152,7 @@ xcodegen generate
 ```
 
 #### 2. Build and Deploy from Xcode
-1. Open [iosAIBridge.xcodeproj](file:///Users/pkc/Projects/prompt-better/AIBridges/iOS/iosAIBridge.xcodeproj) in Xcode.
+1. Open [iosAIBridge.xcodeproj](iOS/iosAIBridge.xcodeproj) in Xcode.
 2. Select the `iosAIBridge` scheme.
 3. Target a connected physical iOS 26+ device or an iOS 26+ Simulator.
 4. Click **Run** (`Cmd + R`).
