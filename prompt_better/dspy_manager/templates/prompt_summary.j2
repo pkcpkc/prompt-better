@@ -1,0 +1,49 @@
+┌─────────────────────────────────────────────────────────────────┐
+{%- if is_optimize %}
+│  Optimization result: {{ prompt_name }}
+{%- else %}
+│  Validation result: {{ prompt_name }}
+{%- endif %}
+└─────────────────────────────────────────────────────────────────┘
+{%- if is_optimize %}
+  Train / eval examples : {{ train_size }} / {{ eval_size }}
+{%- else %}
+  Examples count        : {{ eval_size }}
+{%- endif %}
+
+Average optimization:
+| {{ "" | align_left(15) }} | {{ "aggregate score" | align_center(19) }} | {{ "structural score" | align_center(20) }} | {{ "similarity score" | align_center(20) }} | {{ "teacher score" | align_center(17) }} |
+| :-------------- | :-----------------: | :------------------: | :------------------: | :---------------: |
+| {{ "baseline" | align_left(15) }} | {{ baseline.aggregate_score | format_score | align_center(19) }} | {{ baseline.structural_score | format_score | align_center(20) }} | {{ baseline.similarity_score | format_score | align_center(20) }} | {{ baseline.teacher_score | format_score | align_center(17) }} |
+{%- if is_optimize %}
+| {{ "optimization" | align_left(15) }} | {{ optimized.aggregate_score | format_score | align_center(19) }} | {{ optimized.structural_score | format_score | align_center(20) }} | {{ optimized.similarity_score | format_score | align_center(20) }} | {{ optimized.teacher_score | format_score | align_center(17) }} |
+{%- endif %}
+
+{%- if is_optimize %}
+
+Per dataset optimization:
+{%- else %}
+
+Per dataset validation:
+{%- endif %}
+| {{ "" | align_left(15) }} | {{ "aggregate score" | align_center(19) }} | {{ "structural score" | align_center(20) }} | {{ "similarity score" | align_center(20) }} | {{ "teacher score" | align_center(17) }} |
+| :-------------- | :-----------------: | :------------------: | :------------------: | :---------------: |
+{%- for c in cases %}
+{%- if is_optimize %}
+| {{ c.example_id | align_left(15) }} | {{ c.diff_scores.aggregate_score | format_diff | align_center(19) }} | {{ c.diff_scores.structural_score | format_diff | align_center(20) }} | {{ c.diff_scores.similarity_score | format_diff | align_center(20) }} | {{ c.diff_scores.teacher_score | format_diff | align_center(17) }} |
+{%- else %}
+| {{ c.example_id | align_left(15) }} | {{ c.baseline_scores.aggregate_score | format_score | align_center(19) }} | {{ c.baseline_scores.structural_score | format_score | align_center(20) }} | {{ c.baseline_scores.similarity_score | format_score | align_center(20) }} | {{ c.baseline_scores.teacher_score | format_score | align_center(17) }} |
+{%- endif %}
+{%- endfor %}
+
+{%- if has_teacher_rationales %}
+
+── Teacher rationales ─────────────────────────────────────────
+{%- for c in cases %}
+{%- if c.teacher_rationale %}
+
+  [{{ c.example_id }}]
+         {{ c.teacher_rationale | fix_encoding | wordwrap(70, wrapstring="\n         ") }}
+{%- endif %}
+{%- endfor %}
+{%- endif %}

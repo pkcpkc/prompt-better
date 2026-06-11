@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Any
 
 from .models import PromptSpec
 
@@ -27,3 +27,18 @@ def load_prompt_specs(prompts_dir: Path) -> Dict[str, PromptSpec]:
             print(f"Error loading {json_file}: {e}")
             
     return specs
+
+
+def preview_schema(prompts_dir: Path, prompt_name: str) -> Dict[str, Any]:
+    """Returns JSON schema for given prompt_name or all loaded prompts."""
+    specs = load_prompt_specs(prompts_dir)
+    if prompt_name == "ALL":
+        return {name: spec.to_json_schema() for name, spec in specs.items()}
+    return specs[prompt_name].to_json_schema()
+
+
+def list_prompts(prompts_dir: Path) -> List[PromptSpec]:
+    """Lists all loaded prompt specifications."""
+    specs = load_prompt_specs(prompts_dir)
+    return list(specs.values())
+

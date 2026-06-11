@@ -123,7 +123,7 @@ class PromptSpec(BaseModel):
 
     @property
     def fields(self) -> List[PromptFieldSpec]:
-        """Legacy compatibility property to get all fields."""
+        """Compatibility property to get all fields (inputs and outputs)."""
         res = []
         for f in self.instructions.context:
             f.role = "input"
@@ -167,51 +167,3 @@ class PromptSpec(BaseModel):
         if "instructions" in data and "context" in data["instructions"] and not data["instructions"]["context"]:
             data["instructions"].pop("context")
         self.source_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
-class HistoryMessageSpec(BaseModel):
-    role: str
-    content: Optional[str] = None
-    prompt_name: Optional[str] = None
-    inputs: Dict[str, str] = {}
-    template_override: Optional[str] = None
-
-
-class PromptExample(BaseModel):
-    example_id: str = Field(alias="id")
-    prompt_name: str
-    inputs: Dict[str, str]
-    reference_output: Dict[str, Any]
-    rubric: List[str] = []
-    history: List[HistoryMessageSpec] = []
-
-
-class EndpointConfig(BaseModel):
-    base_url: str
-    model: str
-    api_key: str
-    timeout_seconds: float = 120.0
-
-
-class OptimizationConfig(BaseModel):
-    student: EndpointConfig
-    teacher: Optional[EndpointConfig]
-    prompts_dir: Path
-    dataset_file: Path
-    prompt_name: str
-    auto_mode: str = "light"
-    num_threads: int = 6
-    train_ratio: float = 0.8
-    apply: bool = False
-
-
-class ValidationResult(BaseModel):
-    example_id: str
-    prompt_name: str
-    mode: str
-    candidate_output: Dict[str, Any]
-    structural_score: float
-    similarity_score: float
-    aggregate_score: float
-    teacher_score: Optional[float] = None
-    teacher_rationale: Optional[str] = None

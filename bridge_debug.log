@@ -1,0 +1,4 @@
+[ NOTICE ] Server started on http://::1:8080
+[ INFO ] POST /v1/chat/completions [request-id: 7294C561-D4D0-4780-B869-F1705DE9DCE7]
+[ INFO ] POST /v1/chat/completions [request-id: ED31EC9D-6123-435A-9739-AA30C28B8021]
+

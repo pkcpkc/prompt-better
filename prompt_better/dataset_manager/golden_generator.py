@@ -3,18 +3,18 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .models import EndpointConfig, PromptSpec
-from .json_prompts import load_prompt_specs
-from .openai_structured import call_json_schema
 
 def generate_golden_truth(
     case_file: Path,
     prompts_dir: Path,
     dataset_dir: Path,
     prompt_name: str,
-    teacher_config: Optional[EndpointConfig] = None
+    teacher_config: Optional[Any] = None
 ) -> None:
-    """Loads a test case, loads prompt specification, generates golden output, and saves to golden-truth."""
+    """Loads a test case, loads prompt specification, generates golden output via teacher model, and saves to golden-truth."""
+    from prompt_better.prompt_json import load_prompt_specs
+    from prompt_better.dspy_manager.openai_structured import call_json_schema
+
     if not case_file.exists():
         raise FileNotFoundError(f"Test case file not found at {case_file}")
         

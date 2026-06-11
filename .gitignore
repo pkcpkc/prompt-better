@@ -13,9 +13,7 @@ build/
 **/build/
 
 # Xcode & Swift
-AIBridges/iOS/iosAIBridge.xcodeproj/
 AIBridges/iOS/iosAIBridge.xcworkspace/
-*.xcodeproj/
 *.xcworkspace/
 DerivedData/
 *.xcresult
@@ -54,7 +52,7 @@ htmlcov/
 
 # Generated Artifacts
 Generated/
-prompts/ios/prompts/*/results/
+**/results
 
 # Generated JS bundles
 iosApp/ResearchShare/Action.js
@@ -65,7 +63,3 @@ local.properties
 .env
 .env.*
 *.env
-.prompt_better_cache.db
-
-
-

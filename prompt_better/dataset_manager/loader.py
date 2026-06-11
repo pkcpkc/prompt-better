@@ -1,36 +1,31 @@
 from __future__ import annotations
-
 import json
-import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Tuple
 
-from .models import PromptExample, PromptSpec
-
-
-TOKEN_PATTERN = re.compile(r"\w+", re.UNICODE)
+from .models import PromptExample
+from prompt_better.prompt_json.models import PromptSpec
 
 
 def load_examples(dataset_path: Path) -> List[PromptExample]:
+    """Loads prompt examples from the nested prompts/dataset/ and prompts/golden-truth/ directories."""
     examples: List[PromptExample] = []
-    
-    if dataset_path.is_file():
-        try:
-            payload = json.loads(dataset_path.read_text(encoding="utf-8"))
-            for prompt_name, items in payload.items():
-                for item in items:
-                    case_data = dict(item)
-                    case_data["prompt_name"] = prompt_name
-                    examples.append(PromptExample.model_validate(case_data))
-        except Exception as e:
-            print(f"Error loading legacy dataset file {dataset_path}: {e}")
-        return examples
-
-    # New nested layout: dataset_path contains prompt directories, each having dataset/ and golden-truth/
-    # E.g. dataset_path/ArticleInsight/dataset/*.json
-    # We also support dataset_path itself being a prompt directory
     prompt_dirs = []
     
+    # Load validation schemas
+    dataset_schema_path = Path(__file__).parent / "dataset-schema.json"
+    golden_schema_path = Path(__file__).parent / "golden-schema.json"
+    dataset_schema = None
+    golden_schema = None
+    try:
+        import jsonschema
+        if dataset_schema_path.exists():
+            dataset_schema = json.loads(dataset_schema_path.read_text(encoding="utf-8"))
+        if golden_schema_path.exists():
+            golden_schema = json.loads(golden_schema_path.read_text(encoding="utf-8"))
+    except ImportError:
+        jsonschema = None
+
     # 1. Check if dataset_path itself contains a 'dataset' subfolder
     if (dataset_path / "dataset").exists():
         prompt_dirs.append(dataset_path)
@@ -52,6 +47,14 @@ def load_examples(dataset_path: Path) -> List[PromptExample]:
         for json_file in dataset_dir.glob("*.json"):
             try:
                 inputs_data = json.loads(json_file.read_text(encoding="utf-8"))
+                
+                # Validate dataset file structure
+                if jsonschema is not None and dataset_schema is not None:
+                    try:
+                        jsonschema.validate(instance=inputs_data, schema=dataset_schema)
+                    except jsonschema.ValidationError as ve:
+                        print(f"Warning: Dataset case file {json_file} failed schema validation: {ve.message}")
+                
                 case_id = inputs_data.get("id", json_file.stem)
                 inputs = inputs_data.get("inputs", {})
                 history = inputs_data.get("history", [])
@@ -61,6 +64,14 @@ def load_examples(dataset_path: Path) -> List[PromptExample]:
                     continue
                     
                 golden_data = json.loads(golden_file.read_text(encoding="utf-8"))
+                
+                # Validate golden truth file structure
+                if jsonschema is not None and golden_schema is not None:
+                    try:
+                        jsonschema.validate(instance=golden_data, schema=golden_schema)
+                    except jsonschema.ValidationError as ve:
+                        print(f"Warning: Golden truth case file {golden_file} failed schema validation: {ve.message}")
+                
                 reference_output = golden_data.get("reference_output", {})
                 rubric = golden_data.get("rubric", [])
                 
@@ -81,10 +92,12 @@ def load_examples(dataset_path: Path) -> List[PromptExample]:
 
 
 def examples_for_prompt(examples: Iterable[PromptExample], prompt_name: str) -> List[PromptExample]:
+    """Filters examples by target prompt name."""
     return [example for example in examples if example.prompt_name == prompt_name]
 
 
 def split_examples(examples: List[PromptExample], train_ratio: float) -> Tuple[List[PromptExample], List[PromptExample]]:
+    """Splits examples into training and evaluation sets based on ratio."""
     if not examples:
         return [], []
     sorted_examples = sorted(examples, key=lambda item: item.example_id)
@@ -95,13 +108,13 @@ def split_examples(examples: List[PromptExample], train_ratio: float) -> Tuple[L
 
 
 def resolve_history_messages(example: PromptExample, specs: Dict[str, PromptSpec]) -> List[Dict[str, str]]:
+    """Resolves chat history template specifications or raw contents into role/message pairs."""
     messages: List[Dict[str, str]] = []
     for entry in example.history:
         if entry.content is not None:
             content = entry.content
         elif entry.prompt_name is not None:
             prompt_spec = specs[entry.prompt_name]
-            # Use spec.build_instructions (renamed from build_prompt in refactor)
             content = prompt_spec.build_instructions(entry.inputs, template_override=entry.template_override)
         else:
             raise ValueError(f"History entry in {example.example_id} is missing content and prompt_name")
@@ -110,40 +123,7 @@ def resolve_history_messages(example: PromptExample, specs: Dict[str, PromptSpec
 
 
 def flatten_history(messages: List[Dict[str, str]]) -> str:
+    """Formats role/message lists into formatted instruction prompt texts."""
     if not messages:
         return ""
     return "\n\n".join(f"[{message['role'].upper()}]\n{message['content']}" for message in messages)
-
-
-def normalize_text(value: Any) -> str:
-    if value is None:
-        return ""
-    if isinstance(value, list):
-        return " ".join(normalize_text(item) for item in value)
-    if isinstance(value, dict):
-        return " ".join(normalize_text(item) for item in value.values())
-    text = str(value).strip().lower()
-    return " ".join(TOKEN_PATTERN.findall(text))
-
-
-def token_f1(reference: Any, candidate: Any) -> float:
-    reference_tokens = normalize_text(reference).split()
-    candidate_tokens = normalize_text(candidate).split()
-    if not reference_tokens and not candidate_tokens:
-        return 1.0
-    if not reference_tokens or not candidate_tokens:
-        return 0.0
-    reference_counts: Dict[str, int] = {}
-    candidate_counts: Dict[str, int] = {}
-    for token in reference_tokens:
-        reference_counts[token] = reference_counts.get(token, 0) + 1
-    for token in candidate_tokens:
-        candidate_counts[token] = candidate_counts.get(token, 0) + 1
-    overlap = 0
-    for token, count in reference_counts.items():
-        overlap += min(count, candidate_counts.get(token, 0))
-    if overlap == 0:
-        return 0.0
-    precision = overlap / len(candidate_tokens)
-    recall = overlap / len(reference_tokens)
-    return 2 * precision * recall / (precision + recall)

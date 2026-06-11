@@ -1,0 +1,38 @@
+{
+  "student": {
+    "base_url": "http://localhost:8080/v1",
+    "model": "apple-intelligence"
+  },
+  "student_desc": "The target LLM endpoint whose prompt instructions will be optimized.",
+  
+  "teacher": {
+    "base_url": "http://localhost:8000/v1",
+    "model": "agentic"
+  },
+  "teacher_desc": "The high-capacity LLM endpoint (e.g. GPT-4o) used to generate prompt proposals and grade output quality.",
+  
+  "auto_mode": "medium",
+  "auto_mode_desc": "DSPy MIPROv2 search mode depth ('light' for speed, 'medium' for balanced, 'heavy' for exhaustive search).",
+  
+  "num_threads": 4,
+  "num_threads_desc": "Number of parallel threads to use during metric evaluations (keep low for local models, high for cloud APIs).",
+  
+  "train_ratio": 0.8,
+  "train_ratio_desc": "Split ratio of the dataset examples allocated for training, with the remainder used for validation.",
+  
+  "requires_permission_to_run": true,
+  "requires_permission_to_run_desc": "Ask for user confirmation of estimated API token costs before executing compilation loops.",
+  
+  "optimizer": "predict",
+  "optimizer_desc": "Configure the compiler/predictor mode: 'chain-of-thought' (default) or 'predict' (recommended for iOS/schema-guided structured output).",
+
+  
+  "num_trials": null,
+  "num_trials_desc": "Direct override for compilation trials count in MIPROv2. Set to an integer to bypass auto mode default.",
+  
+  "minibatch": null,
+  "minibatch_desc": "Controls whether compilation runs on subsets of training examples (recommended for dataset sizes > 100).",
+  
+  "num_candidates": null,
+  "num_candidates_desc": "Explicit limit on the number of prompt instruction candidates proposed by the teacher."
+}

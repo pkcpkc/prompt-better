@@ -9,7 +9,7 @@ final class LocalAIBridgeTests: XCTestCase {
         // We simulate how the LocalAIBridge processes messages
         let bridge = LocalAIBridge.shared
         
-        let request = OpenAI.ChatCompletionRequest(
+        let _ = OpenAI.ChatCompletionRequest(
             model: "test-model",
             messages: [
                 .init(role: "system", content: "You act as a mock test AI"),

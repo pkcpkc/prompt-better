@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Golden Truth Definition",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier matching the test case."
+    },
+    "reference_output": {
+      "type": "object",
+      "description": "Expected structured output key-value mapping."
+    },
+    "rubric": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Quality criteria for evaluation."
+    }
+  },
+  "required": ["reference_output"]
+}

@@ -5,12 +5,12 @@ import tempfile
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-from prompt_better.json_prompts import load_prompt_specs  # noqa: E402
+from prompt_better.prompt_json import load_prompt_specs  # noqa: E402
 from prompt_better.cli import _available_generation_languages, _resolve_generation_template  # noqa: E402
-from prompt_better.swift_generator import generate_from_json  # noqa: E402
+from prompt_better.prompt_json import generate_from_json  # noqa: E402
 
 
 
@@ -178,7 +178,7 @@ class JSONPromptTests(unittest.TestCase):
 
         template = _resolve_generation_template(Args())
 
-        self.assertEqual(template.name, "swift_gen.jinja2")
+        self.assertEqual(template.name, "swift.jinja2")
         self.assertTrue(template.exists())
 
     def test_available_generation_languages_come_from_templates(self) -> None:

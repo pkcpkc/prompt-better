@@ -37,9 +37,16 @@ dependencies = [
 prompt-optimize = "prompt_better.cli:main"
 
 [tool.setuptools]
-packages = ["prompt_better"]
+packages = [
+    "prompt_better",
+    "prompt_better.prompt_json",
+    "prompt_better.dataset_manager",
+    "prompt_better.dspy_manager",
+]
 
 [tool.setuptools.package-data]
-prompt_better = ["templates/*", "prompt-schema.json"]
+"prompt_better.prompt_json" = ["templates/*", "prompt-schema.json"]
+"prompt_better.dataset_manager" = ["dataset-schema.json", "golden-schema.json"]
+"prompt_better.dspy_manager" = ["templates/*"]
 
 

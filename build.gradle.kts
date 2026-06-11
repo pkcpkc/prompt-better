@@ -61,6 +61,7 @@ fun Exec.configurePromptOptimizationRuntime(
 
     doFirst {
         val argsList = mutableListOf(
+            "mise", "exec", "--",
             promptOptimizationPython,
             "-m", "prompt_better.cli",
             command,
@@ -91,7 +92,7 @@ tasks.register<Exec>("install") {
     group = "ai"
     description = "Installs the promptOptimization Python package and its dependencies in editable mode."
     workingDir = projectDir
-    commandLine(promptOptimizationPython, "-m", "pip", "install", "-e", ".")
+    commandLine("mise", "exec", "--", "uv", "pip", "install", "-e", ".")
 }
 
 tasks.register<Exec>("list") {
@@ -100,6 +101,7 @@ tasks.register<Exec>("list") {
     workingDir = projectDir
     doFirst {
         commandLine(
+            "mise", "exec", "--",
             promptOptimizationPython,
             "-m", "prompt_better.cli",
             "list-prompts",
@@ -114,6 +116,7 @@ tasks.register<Exec>("previewSchema") {
     workingDir = projectDir
     doFirst {
         commandLine(
+            "mise", "exec", "--",
             promptOptimizationPython,
             "-m", "prompt_better.cli",
             "preview-schema",
@@ -127,7 +130,7 @@ tasks.register<Exec>("test") {
     group = "verification"
     description = "Runs dependency-light promptOptimization unit tests."
     workingDir = projectDir
-    commandLine(promptOptimizationPython, "-m", "unittest", "discover", "tests")
+    commandLine("mise", "exec", "--", promptOptimizationPython, "-m", "unittest", "discover", "prompt_better")
 }
 
 tasks.register<Exec>("validate") {
@@ -183,6 +186,7 @@ abstract class GenerateSwiftPromptsTask @Inject constructor(
             execOperations.exec {
                 workingDir = project.projectDir
                 val args = mutableListOf(
+                    "mise", "exec", "--",
                     pythonCmd,
                     "-m", "prompt_better.cli",
                     "generate",

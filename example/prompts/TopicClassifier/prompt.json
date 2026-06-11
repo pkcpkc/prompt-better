@@ -1,0 +1,40 @@
+{
+  "name": "TopicClassifierPrompt",
+  "instructions": {
+    "prompt": "Tell what this is about: {{text}}",
+    "context": [
+      {
+        "name": "text",
+        "type": "string",
+        "desc": "The input text to classify.",
+        "items": null,
+        "min_count": null,
+        "max_count": null,
+        "role": "input"
+      }
+    ]
+  },
+  "outputs": [
+    {
+      "name": "topic",
+      "type": "string",
+      "desc": "The main topic of the text.",
+      "items": null,
+      "min_count": null,
+      "max_count": null,
+      "role": "output"
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "author": "Paul Hackenberger"
+  },
+  "config": {
+    "model_id": "base",
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "top_k": 1,
+    "max_tokens": 100,
+    "stop_sequences": []
+  }
+}

@@ -4,600 +4,573 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Support](https://img.shields.io/pypi/pyversions/prompt-better.svg)](https://pypi.org/project/prompt-better/)
 
-__*Anything you can prompt, I can prompt better!*__
-
-![Anything you can prompt, I can prompt better](assets/anything-you-can-prompt.jpg)
-
-
-`prompt-better` is a generic, highly reusable, and platform-agnostic framework designed to validate, run, and optimize Large Language Model (LLM) prompts across any OpenAI-compatible API, local runtime, or on-device model. Built on top of **DSPy** and **Pydantic**, it automates complex instruction tuning and structured output validation.
-
-## Framework Overview
-
-> [!NOTE]
-> **Universal Compatibility with Apple Optimization:**  
-> While `prompt-better` is heavily optimized and equipped with a native toolchain for Apple ecosystems (macOS/iOS on-device runtimes), it is **completely generic and platform-agnostic by design**. You can use it in **any environment** to optimize **any prompt** targeting any standard LLM API (including OpenAI, Anthropic, local Llama.cpp, Ollama, Hugging Face, or local cloud endpoints).
-
-Here are the key **USPs** of `prompt-better` as a DSPy optimization wrapper:
-
-* **Cross-Language Apple Silicon Bridges (macOS & iOS):** Exposing Apple's proprietary on-device `FoundationModels` (Swift `LanguageModelSession`) to Python prompt tuning pipelines is notoriously difficult. `prompt-better` provides local **Vapor HTTP Bridges** for macOS and iOS that transform local on-device runtimes into standard OpenAI-compatible `/v1/chat/completions` API endpoints. This lets you optimize prompts directly on target physical Apple Silicon hardware.
-* **Schema-Backed JSON Prompt Specifications (SSOT):** Prompts are defined as language-agnostic data assets (`prompt.json`) representing the **Single Source of Truth (SSOT)**. At runtime, `prompt-better` dynamically constructs type-safe Pydantic schemas, registers matching **DSPy Signatures**, and handles type-safe structured inference on-the-fly, completely abstracting Python class definitions from your workflows.
-* **Decoupled Coached Student-Teacher Pipelines:** Smaller, resource-constrained models (such as on-device Apple weights or 3B–8B local runtimes) lack the reasoning capacity to propose instruction variants or grade outputs during optimization. We pair your target **Student** model (running locally on device) with a high-capacity **Teacher** model (such as GPT-4o in the cloud) to coach, proposal-write, and grade evaluations, ensuring the final compiled prompt is optimized specifically for the unique weights and limits of your target local hardware.
-* **Native Swift Codegen & `@Generable` Integration:** Seamlessly transition from optimization to production. Our template-driven Swift generator translates compiled JSON prompt definitions directly into native, compile-ready Swift structs conforming to Apple's `@Generable` macro. Adding templates for other ecosystems (like Kotlin for Android or TypeScript) is simple and extensible.
-* **Decoupled JSON Golden Truths (Human-in-the-Loop):** Evaluation is strictly compared against gold-standard reference cases stored as clean, structured JSON files. To prevent echo-chamber bias and data contamination, the CLI supports both automated Teacher draft bootstrapping and empty boilerplates, facilitating rigorous human-in-the-loop quality controls.
-* **Robust Fallback Parser & Type Coercion Registry:** Smaller local models often struggle to output strict JSON schemas. `prompt-better` uses generic regex outer-bracket extraction to recover JSON structures wrapped in conversational model responses, and features a **Pluggable Fallback Registry** to perform automatic type coercions (mapping text to integers, floats, and booleans) before final returns.
-* **SQLite Response Caching:** To minimize network costs and local device thermal throttling during intensive optimization runs, the framework integrates a transparent, hashing-based **SQLite Response Cache** that caches LLM/Vapor bridge queries dynamically by hashing request payloads.
+**_ANYTHING YOU CAN PROMPT, I CAN PROMPT BETTER!_**
 
 ---
 
-## Getting Started
+## 1. What This Is About
 
-### 1. Prerequisites
+`prompt-better` is a generic, reusable, and platform-agnostic framework designed to validate, execute, and optimize Large Language Model (LLM) prompts. Instead of hardcoding prompts inside application source files, prompts are defined in a language-agnostic data asset (`prompt.json`), establishing a **Single Source of Truth (SSOT)**.
 
-- **Python 3.10+**
-- **Xcode 26+** with the macOS 26 / iOS 26 SDK (for the Swift toolchain and Apple Foundation Models)
-- A Mac with Apple Silicon running **macOS 26** (required for on-device `FoundationModels` inference)
+### Built on Top of DSPy & Pydantic
+At runtime, `prompt-better` parses the JSON specification and builds type-safe Pydantic models on-the-fly. It automatically generates a corresponding **DSPy Signature** (`Inputs -> PydanticSchemaClass`), mapping unstructured model outputs into strictly validated objects. 
 
-### 2. Install the Python Package
+### Coached Student-Teacher Model Paradigm
+To support resource-constrained target devices (like local 3B–8B weights), the framework uses a **Coached Student-Teacher Pipeline**:
+*   **Teacher Model**: A high-capacity cloud model (e.g., GPT-4o) that drafts prompt/instruction variations, synthesizes few-shot demonstrations, and evaluates execution quality against custom rubrics.
+*   **Student Model**: The target local or on-device model being optimized. The student executes prompt candidates during the compilation loop.
 
-To install the package in editable mode for local development:
+### iOS and macOS On-Device Foundation Models
+`prompt-better` integrates natively with Apple's local **LanguageModelSession** API (iOS 26+ and macOS 26+) using Vapor-based HTTP bridges:
+*   [macOS Vapor Bridge](AIBridges/macOS): Exposes Apple's on-device foundation models as an OpenAI-compatible REST API.
+*   [iOS Vapor Bridge](AIBridges/iOS): Runs directly on physical iOS devices or simulators to serve local model weights.
 
-```bash
-cd prompt-better
-python3 -m pip install -e .
-```
-
-### 3. Create a Prompt Folder
-
-Create a directory under your prompts root. The framework uses **convention-over-configuration**: each prompt lives in its own folder containing standardized files.
-
-```
-prompts/
-└── MyPrompt/
-    ├── prompt.json          # Prompt specification (source of truth)
-    ├── dataset/             # Evaluation input cases (inputs only)
-    │   └── case1.json
-    ├── golden-truth/        # Reference answers (manually provided or auto-generated)
-    │   └── case1.json
-    └── script/              # Optional: data extraction scripts
-        └── extractor.swift
-```
-
-#### `prompt.json` — Prompt Specification
-
-```json
-{
-  "name": "MyPrompt",
-  "metadata": { "version": "1.0.0", "author": "Your Team" },
-  "config": {
-    "model_id": "base",
-    "temperature": 0.0,
-    "top_p": 1.0,
-    "top_k": 1,
-    "max_tokens": 1000,
-    "stop_sequences": []
-  },
-  "instructions": {
-    "prompt": "Identify the primary topic of this text:\n\nText: {{input}}",
-    "context": [
-      { "name": "input", "type": "string", "desc": "The raw input text." }
-    ]
-  },
-  "outputs": [
-    { "name": "topic", "type": "string", "desc": "The identified topic." }
-  ]
-}
-```
-
-#### `dataset/case1.json` — Evaluation Input
-
-```json
-{
-  "id": "case1",
-  "inputs": {
-    "input": "The Berlin Senate is funding new solar panels in dense neighborhoods."
-  }
-}
-```
-
-### 4. Configure Your LLM Endpoints
-
-Create a `config.json` file **one level above** your prompts directory (i.e. next to the `prompts/` folder):
-
-```
-my-project/
-├── config.json          ← here
-└── prompts/
-    └── MyPrompt/
-        └── prompt.json
-```
-
-```json
-{
-  "student": {
-    "base_url": "http://localhost:8080/v1",
-    "model": "apple/foundation-model",
-    "api_key": ""
-  },
-  "teacher": {
-    "base_url": "https://api.openai.com/v1",
-    "model": "gpt-4o",
-    "api_key": "YOUR_API_KEY"
-  },
-  "auto_mode": "light",
-  "num_threads": 6,
-  "train_ratio": 0.8
-}
-```
-
-> **Convention:** The CLI resolves `config.json` as the **parent directory** of the `--prompts-dir` you pass.  
-> All settings can also be overridden with `PROMPT_BETTER_*` environment variables (see [Configuration](#configuration--environment-variables) below).
-
-### 5. Validate and Optimize
-
-```bash
-# List all discovered prompts
-python3 -m prompt_better.cli list-prompts \
-  --prompts-dir ./prompts
-
-# Validate your baseline prompt against the Student model
-python3 -m prompt_better.cli validate \
-  --prompts-dir ./prompts \
-  --dataset ./data \
-  --prompt MyPrompt
-
-# Run DSPy MIPROv2 compilation to optimize prompt instructions
-python3 -m prompt_better.cli optimize \
-  --prompts-dir ./prompts \
-  --dataset ./data \
-  --prompt MyPrompt
-```
+This allows the optimization engine to tune prompts directly for the specific hardware, quantization limits, and quirks of Apple's on-device silicon runtimes.
 
 ---
 
-## Key Core Architectures
+## 2. Short Example for Optimize
 
-### 1. JSON Specifications as the Source of Truth
-Instead of hardcoding prompt structures or outputs in python source files, each prompt is declared in a standard JSON specification:
-- **`instructions`:** Defines the template text and the system context, employing `{{placeholder}}` strings for dynamic input mapping.
-- **`config`:** Defines model parameters (temperature, top_p, stop sequences, token limits).
-- **`inputs`:** Lists input variables with descriptions and types.
-- **`outputs`:** Outlines expected output structures, fully supporting `string`, `integer`, `number`, and `boolean` types (and primitive arrays of them). Values are coerced at runtime to ensure complete type compliance.
+Follow these steps to optimize instructions for the sample `TopicClassifierPrompt`.
 
-### 2. Dynamic DSPy Signature & Pydantic Mapping
-
-At runtime, the framework loads the JSON prompt specification, dynamically builds type-safe Pydantic schemas, registers a corresponding DSPy Signature, and handles structured inference:
-
-```mermaid
-graph TD
-    spec[JSON Prompt Spec] --> parser[Runtime Parser]
-    parser --> inputs[1. Extract Inputs]
-    parser --> outputs[2. Extract Outputs]
-    outputs --> pydantic[3. Generate Pydantic Schema]
-    inputs & pydantic --> dspy[4. Compile DSPy Signature]
-    dspy --> runner[5. Execute LLM Call with Auto-Correction]
-```
-
-1. **Pydantic Schema Synthesis:** Dynamically constructs a type-safe **Pydantic schema** representing the desired output structure, using the `desc` values in the JSON as field descriptions. Both inputs and outputs are dynamically mapped to corresponding Python types (`int`, `float`, `bool`, `str`).
-2. **DSPy Signature Registration:** Matches input variables directly to the JSON's placeholders, and binds outputs to the Pydantic structured output model.
-3. **Execution & Self-Correction:** Automatically processes responses and performs self-correction or structural fallback loops under the hood.
-
-### 3. SQLite Response Caching
-To minimize network costs and local device processor load when testing or compiling loops on mobile device bridges, the framework integrates a transparent, hashing-based **SQLite Response Cache**:
-* **Mechanism:** Computes a unique key by hashing the entire request signature: `sha256(model + messages + schema + temperature)`.
-* **Behavior:** Cache hits bypass network and local Vapor bridge queries, dramatically speeding up repetitive validation runs.
-* **Control:** Cache is stored locally at `.prompt_better_cache.db` in the workspace root. Disable caching at any time by setting `PROMPT_BETTER_DISABLE_CACHE=1` in your environment.
-
-### 4. Live Optimizer Console Telemetry
-During optimization runs (MIPROv2 compile loops), the optimizer prints a dynamic console progress dashboard. This gives you instant visibility into:
-* The live number of candidate prompt variations evaluated.
-* Live-updating average and best metric scores.
-* The absolute metric lift compared directly to your unoptimized baseline score.
-
-### 5. Student-Teacher Optimization Pipeline & Golden Truths
-
-The optimization pipeline decouples execution and validation by pairing your target model with custom verification metrics, golden references, and an optional high-capacity teacher model:
-
-```mermaid
-graph TD
-    subgraph Developer Workspace
-        A[prompt.json]
-        D[Dataset]
-        G[Manual Golden Truths]
-    end
-    subgraph Cloud API
-        T[Teacher Model / e.g. GPT-4o]
-    end
-    subgraph Local Runtime
-        S[Student Model / Apple Foundation Model]
-    end
-    M[Evaluation Metric]
-
-    G --> M
-    D & A -- "Optional Bootstrapping" --> T
-    T -- "Optional Golden Truth Generation" --> G
-    T -- "Grades Outputs (Optional)" --> M
-    T -- "Proposes Prompt Rewrites" --> S
-    S -- "Runs Rewritten Prompts" --> M
-    M -- "Feeds Back Performance" --> Opt[DSPy MIPROv2 Optimizer]
-    Opt -- "Selects Best Variant" --> Win[Optimized prompt.json]
-```
-
-#### Decoupled Reference Answers ("Golden Truths")
-
-To measure prompt improvement, the optimizer compares student outputs against gold-standard reference answers ("golden truths").
-
-> [!WARNING]
-> **The Danger of Blind Model Generation:** Using an LLM to generate its own validation benchmarks can lead to **data contamination** and **echo-chamber bias**, where the student model is tuned simply to mimic the specific errors or stylistic quirks of the teacher model rather than learning actual ground-truth facts. **Human-written references are the absolute gold standard for prompt engineering.**
-
-To facilitate high-quality testing, the framework supports two distinct approaches for reference answers:
-
-* **Manually Provided (Recommended/Standard):**
-  You author your own human-grade expected outputs inside the `golden-truth/` folder. This ensures evaluation metrics are strictly matched to your actual business logic, factual databases, or editorial guidelines.
-
-* **Automated Scaffolding Helper (`generate-golden-truth` command):**
-  To save you from typing out structured JSON files from scratch, the CLI includes a `generate-golden-truth` command. It behaves dynamically based on your environment:
-  * **No Teacher Configured (Boilerplate Creator):** The command reads your `prompt.json` output specifications and generates a **completely empty JSON skeleton** inside the `golden-truth/` folder matching your structure. This provides a perfect starting boilerplate for your manual entries.
-  * **Teacher Configured (Draft Bootstrapper):** It calls your high-capacity **Teacher Model** to write initial draft reference outputs and boilerplate evaluation rubrics. You are expected to manually review, edit, and curate these files before running optimization cycles.
-
-#### The Orchestration Roles
-* **Student Model:** The target model where the prompt will run in production (typically a smaller, local, or on-device model, such as Apple's Foundation Models or a local Llama 3 instance).
-* **Teacher Model:** A higher-capacity cloud model (like GPT-4o or Claude 3.5 Sonnet) used optionally to:
-  - Generate reference answers when not manually provided.
-  - Grade student responses on complex quality axes (coherence, sentiment, tone).
-  - Act as a prompt proposer to write instruction variants for DSPy optimizers (such as `MIPROv2`).
-
-#### `validate` — Baseline Measurement
-
-Sends your **unmodified** prompt to the Student model for each test case in the dataset, then scores the output without changing anything. For each example it:
-
-1. Resolves `{{placeholder}}` tokens in `prompt.json` with the example's input values.
-2. Calls the Student via the OpenAI-compatible `/v1/chat/completions` endpoint.
-3. Scores the response on three axes:
-   - **Structural score** (55% weight) — did the model return all expected fields with correct types?
-   - **Similarity score** (45% weight) — how close is the output to the golden-truth reference?
-   - **Teacher score** (optional) — the Teacher grades quality on a 0.0–1.0 scale with a written rationale.
-
-Run `validate` first to establish a baseline, then `optimize`, then `validate` again to measure the lift.
-
-#### `optimize` — The MIPROv2 Loop
-
-The optimization is **not** brute-force variation testing. The Teacher actively coaches the Student:
-
-1. **Teacher proposes prompt rewrites** — MIPROv2 uses the Teacher (`prompt_model`) to generate reworded instructions: different phrasings, more detail, reordered sections, added few-shot demonstrations.
-2. **Student executes each candidate** — the rewritten prompt is sent to the Student (`task_model`) against the training dataset split.
-3. **Metric scores the output** — combining structural correctness and similarity to golden-truth references.
-4. **MIPROv2 iterates** — informed by which candidates scored well, it proposes new variations. The `auto` mode controls search depth:
-   - `light` — fast, fewer candidates (good for iteration)
-   - `medium` — balanced
-   - `heavy` — exhaustive search (best results, slow)
-5. **Best candidate wins** — scored on the held-out eval set, then graded again by the Teacher as a judge.
-
-#### Where the Winning Prompt Ends Up
-
-| Output | Location |
-| :--- | :--- |
-| Human-readable winning instruction | `<PromptFolder>/results/{PromptName}.report.json` → `"extracted_instruction"` field |
-| Full compiled DSPy module (instruction + few-shot demos) | `<PromptFolder>/results/{PromptName}.dspy.json` |
-
-The report is also printed to stdout. Review the `extracted_instruction`, and if you're satisfied, re-run with `--apply` to write it back into the source `prompt.json`.
-
-
-## Swift Toolchain
-
-The framework includes a complete Swift toolchain for bridging Apple's on-device `FoundationModels` framework to the Python optimizer and for generating production-ready Swift code from JSON prompt definitions.
-
-### Architecture Overview
-
-```mermaid
-graph TD
-    subgraph Python Environment
-        A[Python Optimizer / DSPy]
-    end
-    subgraph Swift Environment [Vapor Server on macOS/iOS]
-        B[AI Bridge]
-        C[AIPromptCore]
-    end
-    subgraph Apple Device
-        D[Apple Foundation Model / On-Device]
-    end
-
-    A -- "HTTP POST /v1/chat/completions" --> B
-    B --> C
-    C -- "Apple FoundationModels API" --> D
-```
-
-### AIPromptCore — Shared Swift Framework
-
-`frameworks/AIPromptCore/` is a Swift Package that provides the shared protocol and session management used by both the main app and the iOS bridge.
-
-| File | Purpose |
-| :--- | :--- |
-| `GenerableWithPrompt.swift` | Protocol extending Apple's `Generable`. Declares `systemPrompt` and `options`; provides `buildSystemPrompt(for:context:)` to resolve `{{placeholder}}` tokens. |
-| `AISessionController.swift` | `@MainActor` singleton wrapping `LanguageModelSession`. Handles session lifecycle and structured generation via `respond(to:generating:)`. |
-| `AIPrompt.swift` | Codable model matching the JSON prompt schema. Includes `Config.toGenerationOptions()` bridge to `FoundationModels.GenerationOptions`. |
-
-**Platforms:** iOS 26.0+, macOS 26.0+  
-**Swift tools version:** 6.0  
-**Library type:** Dynamic (`.dynamic`)
-
-#### Building the XCFramework
-
-To produce an XCFramework for distribution (iOS device + Simulator slices):
-
+### Step 1: Set Up Python Environment
+Install `prompt-better` in editable mode using `uv` and trust python runtimes configured in `mise.toml`:
 ```bash
-cd frameworks/AIPromptCore
-./build_xcframework.sh
-# Output: build/AIPromptCore.xcframework
+# Trust and install local python versions
+mise trust && mise install
+
+# Install prompt-better locally
+mise exec -- uv pip install -e .
 ```
 
-#### Integrating in Your Main Xcode Project
-
-Add the `AIPromptCore` package as a local dependency in your app's `Package.swift` or Xcode project:
-
-```swift
-// In your app's Package.swift
-dependencies: [
-    .package(path: "path/to/prompt-better/frameworks/AIPromptCore")
-],
-targets: [
-    .target(
-        name: "MyApp",
-        dependencies: [
-            .product(name: "AIPromptCore", package: "AIPromptCore")
-        ]
-    )
-]
-```
-
-Then `import AIPromptCore` and conform your generated prompt structs to `GenerableWithPrompt`:
-
-```swift
-import AIPromptCore
-import FoundationModels
-
-@Generable
-struct MyPrompt: GenerableWithPrompt {
-    static let systemPrompt = "Identify the primary topic of this text:\n\nText: {{input}}"
-    static let options: GenerationOptions? = nil
-
-    var topic: String
-}
-
-// Usage:
-let result = try await AISessionController.shared.respond(
-    to: articleText,
-    generating: MyPrompt.self,
-    createNewSession: true
-)
-print(result.topic)
-```
-
-> The `generate` CLI subcommand automates this — it reads a `prompt.json`, renders a Jinja template, and emits a complete, compile-ready Swift struct conforming to `GenerableWithPrompt`.
-
-### AI Bridges — Vapor HTTP Servers
-
-The bridges expose Apple's on-device `FoundationModels` as an **OpenAI-compatible** REST API so the Python optimizer can treat it like any other `/v1/chat/completions` endpoint.
-
-| Bridge | Path | Dependencies | Notes |
-| :--- | :--- | :--- | :--- |
-| **iOS** | `AIBridges/iOS/` | Vapor + AIPromptCore | Uses `AISessionController` for structured generation. Requires an iOS 26 device or simulator. Build via Xcode or `xcodebuild`. |
-| **macOS** | `AIBridges/macOS/` | Vapor | Standalone `LocalAIBridge` wrapping `LanguageModelSession` directly. Runs natively on macOS 26 Apple Silicon. |
-
-#### Running the macOS Bridge
-
+### Step 2: Start Student Vapor Bridge (Example: macOS Bridge)
+Build and run the Apple Silicon bridge server (translates on-device models to `/v1/chat/completions` endpoints):
 ```bash
 cd AIBridges/macOS
-swift build
-swift run App serve --hostname 0.0.0.0 --port 8080
+swift build && swift run App serve --hostname 127.0.0.1 --port 8080
 ```
 
-The Python optimizer can now target `http://localhost:8080/v1` as the student endpoint in `config.json`.
+### Step 3: Setup Configuration & Credentials
 
-#### Running the iOS Bridge
+The framework resolves configurations hierarchically: CLI arguments > Environment variables > Configuration files (`prompt-better.json`).
 
-The iOS bridge must be built and run via Xcode on a device or simulator (requires iOS 26):
+1. **Configuration File (`prompt-better.json`)**:
+   Create a `prompt-better.json` file in the parent folder of your prompts directory (for this example, `example/prompt-better.json`). This defines student/teacher runtimes and defaults:
+   ```json
+   {
+     "student": {
+       "base_url": "http://127.0.0.1:8080/v1",
+       "model": "apple-intelligence",
+       "temperature": 0.2
+     },
+     "teacher": {
+       "base_url": "https://api.openai.com/v1",
+       "model": "gpt-4o",
+       "temperature": 0.2,
+       "eval_temperature": 0.0
+     },
+     "auto_mode": "light",
+     "num_threads": 1
+   }
+   ```
 
+2. **Credentials (API Keys)**:
+   > [!IMPORTANT]
+   > For security, API keys **cannot** be stored in the `prompt-better.json` configuration file. Doing so will trigger a validation error.
+   
+   Provide API keys using either environment variables or direct CLI arguments:
+   * **Via Environment Variables** (Recommended):
+     ```bash
+     export PROMPT_BETTER_TEACHER_API_KEY="sk-proj-..."
+     ```
+   * **Via CLI Flags**:
+     Pass `--teacher-api-key "sk-proj-..."` directly during command execution.
+
+### Step 4: Run DSPy Optimization
+Run the `optimize` command. Pass `--no-requires-permission-to-run` to bypass estimated token cost warnings when targeting free local endpoints:
 ```bash
-cd AIBridges/iOS
-# Generate the Xcode project (uses XcodeGen):
-./generate_project.sh
-open iosAIBridge.xcodeproj
+python3 -m prompt_better.cli optimize \
+  --prompts-dir example/prompts \
+  --prompt TopicClassifierPrompt \
+  --no-requires-permission-to-run
 ```
 
-Build and run on an iOS 26 device. The Vapor server starts on the device at `http://<device-ip>:8080/v1`.
+During execution, the DSPy `MIPROv2` compiler will propose instruction re-writes via the Teacher model, run them on the Student bridge, and evaluate output quality.
 
-### Swift Code Generator
-
-Generates type-safe `GenerableWithPrompt` Swift structs from JSON prompt definitions:
-
-```bash
-# Single prompt:
-python3 -m prompt_better.cli generate \
-  --source ./prompts/MyPrompt/prompt.json \
-  --target ./Generated/MyPrompt.swift \
-  -language swift
-```
-
-`-language <language>` resolves a bundled template named `prompt_better/templates/<language>_gen.jinja2` and reports an error if that template is not available. For example, `-language swift` uses `swift_gen.jinja2`; adding `kotlin_gen.jinja2` makes `-language kotlin` available. Alternatively, pass `-template` / `--template` with your own Jinja template path:
-
-```bash
-python3 -m prompt_better.cli generate \
-  --source ./prompts/MyPrompt/prompt.json \
-  --target ./Generated/MyPrompt.swift \
-  -template ./templates/custom_swift.jinja2
-```
-
-The generated struct is production-ready — `import AIPromptCore`, conform to `GenerableWithPrompt`, include it in your Xcode target, and call via `AISessionController`.
+The optimization output is written to:
+*   `results/optimized-prompt.json`: Optimized prompt with winning instructions.
+*   `results/optimize-report.json`: Metrics report and validation summary.
+*   `results/dspy.json`: Serialized DSPy compile state.
 
 ---
 
-## Directory Structure
+## 3. Subcommand `validate`
 
-- **`prompt_better/`** — Core Python package
-  - `cli.py` — Reusable command-line interface exposing subcommands.
-  - `json_prompts.py` — Dynamic JSON prompt specification parser and Pydantic model builder.
-  - `models.py` — OpenAI-compatible structured output client and teacher/student orchestration.
-  - `dataset.py` — Loader for prompt-specific evaluation cases.
-  - `optimizer.py` — DSPy MIPROv2 compiler and multithreaded evaluation pipeline.
-  - `golden_generator.py` — Golden-truth reference generator and evaluation rubric builder.
-  - `swift_generator.py` — Template-driven codegen module translating JSON prompt definitions into generated files.
-- **`frameworks/AIPromptCore/`** — Shared Swift package
-  - `GenerableWithPrompt.swift` — Protocol bridging JSON prompts to Apple's `Generable`.
-  - `AISessionController.swift` — `@MainActor` session manager wrapping `LanguageModelSession`.
-  - `AIPrompt.swift` — Codable model matching the JSON prompt schema.
-  - `build_xcframework.sh` — Builds the XCFramework for iOS device + simulator.
-- **`AIBridges/iOS/`** — iOS Vapor bridge (OpenAI-compatible server using AIPromptCore)
-- **`AIBridges/macOS/`** — macOS Vapor bridge (standalone `LocalAIBridge`)
-- **`tests/`** — Pytest suite validating parser safety, JSON serializations, and schema builders.
-- **`prompt-schema.json`** — JSON Schema for validating prompt definition files.
-- **`pyproject.toml`** — Standalone Python dependency configuration.
+The `validate` subcommand evaluates the **status quo** of your prompt's baseline instructions against a target dataset. It does not perform instruction rewriting or few-shot compilation. Instead, it measures how well the target Student model conforms to structure and accuracy guidelines under the current prompt instructions.
+
+> [!TIP]
+> For a deeper conceptual foundation on evaluating AI systems, we recommend referring to the book **"AI Engineering - Building Application with Foundation Models"** by **Chip Huyen** (O'Reilly), specifically **Chapter 4. Evaluate AI Systems**.
+
+### Mathematical Scoring Formulas
+
+For each evaluation case, the candidate output is rated between `0.0` and `1.0` using weighted scores. Since a Teacher Model is required, the validator fetches a semantic grade from the teacher and averages it with structural and similarity scores:
+
+$$\text{Aggregate Score} = \frac{(0.55 \times S_{\text{structural}} + 0.45 \times S_{\text{similarity}}) + S_{\text{teacher}}}{2}$$
+
+### Scoring Metrics & Code References
+
+The scores are resolved in code inside [evaluator.py](prompt_better/dspy_manager/evaluator.py) via a resolved `Evaluator` instance (by default, `DefaultEvaluator` inherits from `BaseEvaluator`):
+
+1.  **Validation Loop**: [validate_prompt](prompt_better/dspy_manager/optimizer.py) iterates through prompt files and gathers results using `_validate_single_example`.
+2.  **Structural Score ($S_{\text{structural}}$)**: Calculated in `structural_score`. It verifies:
+    *   Fields map precisely to target JSON schema types.
+    *   Array counts match specified boundaries (e.g. `min_count`, `max_count`).
+3.  **Similarity Score ($S_{\text{similarity}}$)**: Calculated in `similarity_score`. It measures token-level F1 overlap (precision and recall of matching tokens) between the generated values and the golden-truth references.
+4.  **Teacher Score ($S_{\text{teacher}}$)**: Resolved via `teacher_score`. The Teacher model receives a structured grading schema containing the prompt instructions, inputs, candidate output, reference output, and quality rubric. It responds with a numeric score (`0.0` to `1.0`) and a text justification.
+
+### Custom Evaluator Implementations
+
+You can customize the evaluation and scoring by providing your own evaluator subclassing `BaseEvaluator`:
+
+```python
+from prompt_better.dspy_manager import BaseEvaluator
+
+class CustomEvaluator(BaseEvaluator):
+    def structural_score(self, spec, candidate) -> float:
+        # Custom structural scoring
+        return 1.0
+
+    def similarity_score(self, spec, reference, candidate) -> float:
+        # Custom similarity scoring
+        return 0.8
+```
+
+#### Setting the Custom Evaluator
+
+You can configure the custom evaluator dynamically in three ways (resolved hierarchically):
+
+1. **CLI Flag**: Specify `--evaluator path.to.module:CustomEvaluator` or file path `path/to/script.py:CustomEvaluator` (or simply `path/to/script.py` which auto-detects the subclass).
+2. **Environment Variable**: `export PROMPT_BETTER_EVALUATOR="path.to.module:CustomEvaluator"`
+3. **Global Config (`prompt-better.json`)**:
+   ```json
+   {
+     "evaluator": "path.to.module:CustomEvaluator"
+   }
+   ```
+
+### Validation Flow Diagram
+
+```mermaid
+flowchart TD
+    Start["Start cli validate"] --> Scan["Scan --prompts-dir for prompt.json"]
+    Scan --> LoadDataset["Load dataset/ and golden-truth/ case cases"]
+    LoadDataset --> Iterate["For each test case..."]
+    Iterate --> BuildPayload["Compile prompt instructions + case inputs"]
+    BuildPayload --> RunStudent["Invoke Student Model via HTTP Bridge"]
+    RunStudent --> ParseOutput["Parse output JSON schema"]
+    ParseOutput --> CalcStruct["Calculate Structural Score (55% weight)"]
+    ParseOutput --> CalcSim["Calculate Token F1 Similarity (45% weight)"]
+    
+    CalcStruct --> CallTeacher["Invoke Teacher Model to grade output against rubric"]
+    CalcSim --> CallTeacher
+    CallTeacher --> CalcTeacher["Average (Base Scores + Teacher Score)"]
+    CalcTeacher --> SaveResult["Save ValidationResult metrics"]
+    
+    SaveResult --> CheckMore{More cases?}
+    CheckMore -- Yes --> Iterate
+    CheckMore -- No --> GenerateReport["Output JSON report & print summary stats"]
+    GenerateReport --> End["End validate"]
+```
 
 ---
 
-## Standalone CLI Reference
+## 4. Subcommand `optimize`
 
-```bash
-python3 -m prompt_better.cli [SUBCOMMAND] [ARGS]
+The `optimize` subcommand applies per default the DSPy **MIPROv2** (Multi-prompt Instruction Proposal and Few-shot Optimization) compiler to find the best instructions and few-shot examples for your target student model.
+
+> [!TIP]
+> For a deeper conceptual foundation on engineering and compiling prompts, we recommend referring to the book **"AI Engineering - Building Application with Foundation Models"** by **Chip Huyen** (O'Reilly), specifically **Chapter 5. Prompt Engineering**.
+
+> [!NOTE]
+> By default, the final evaluation at the end of optimization runs on **all dataset cases** to print a complete baseline vs optimized comparison table. To run the final evaluation only on the held-out evaluation set (`evalset`) slice, specify the `--eval-cases-only` flag.
+
+> [!IMPORTANT]
+> **iOS & On-Device Model Recommendation**: If you compile your prompt specification to a Swift type conformant to `GenerableWithPrompt` (which utilizes Apple's native schema-guided structured output), you have two options for handling optimization:
+> 
+> *   **Option 1: Direct Prediction (Recommended for speed/simplicity)**: Optimize your prompt using `--optimizer predict` (or set `"optimizer": "predict"` in `prompt-better.json`). This compiles the prompt using `dspy.Predict` instead of the default `dspy.ChainOfThought` (which uses `"chain-of-thought"`). Because the default CoT generates formatting instructions instructing the model to output intermediate reasoning with text prefixes (e.g. `Reasoning:` and `Output:`), it conflicts with Apple's native structured JSON schema constraint (where no `reasoning` field exists), leading to parsing or validation errors. Running with `predict` compiles cleanly without these text prefixes.
+> 
+> *   **Option 2: Schema-guided Chain of Thought (Recommended for accuracy)**: If the target model needs step-by-step reasoning to deliver accurate outputs, you must explicitly model the reasoning field inside your `prompt.json` output schema:
+>     ```json
+>     "outputs": [
+>       {
+>         "name": "reasoning",
+>         "type": "string",
+>         "desc": "Explanation of the context based on domain-specific lexical cues."
+>       },
+>       {
+>         "name": "topic",
+>         "type": "string",
+>         "desc": "The final classified topic category."
+>       }
+>     ]
+>     ```
+>     When compiled, the generated Swift struct will contain both fields as `@Guide` properties:
+>     ```swift
+>     @Generable
+>     struct TopicClassifierPrompt: GenerableWithPrompt {
+>         @Guide(description: "Explanation of the context...")
+>         var reasoning: String
+> 
+>         @Guide(description: "The final classified topic category.")
+>         var topic: String
+>     }
+>     ```
+>     This aligns the prompt's reasoning instructions with the Swift schema structure, allowing Apple's native session to parse the intermediate reasoning step successfully.
+
+
+
+### Optimization Workflow
+1.  **Splitting Dataset**: The command loads optimization cases and splits them into training and evaluation sets based on `--train-ratio` (default `0.8`).
+2.  **Generating Candidates (Teacher)**: The high-capacity Teacher model reads the baseline specifications, analyzes errors from initial runs, and generates instruction proposals (candidates).
+3.  **Compiling Few-Shot Demonstrations**: DSPy selects successful execution traces from the student model running on the training dataset to include as few-shot bootstrap examples in the compiled prompt.
+4.  **Evaluation Iteration**: Candidate instruction proposals are evaluated against the training and validation sets on the student model.
+5.  **Selecting the Winner**: The combination of instructions and few-shot demonstrations yielding the highest aggregate score is compiled and saved.
+
+### Optimization Flow Diagram
+
+```mermaid
+flowchart TD
+    Start["Start cli optimize"] --> Load["Load specifications & split dataset (Train vs. Eval)"]
+    Load --> CreateSignature["Map prompt context & outputs to DSPy Signature"]
+    CreateSignature --> EvalBaseline["Run Student baseline to calculate baseline score"]
+    
+    EvalBaseline --> InitMIPRO["Initialize DSPy MIPROv2 Optimizer"]
+    InitMIPRO --> TeacherGenerate["Teacher proposes new instruction variations"]
+    
+    subgraph CompLoop ["Optimization Compilation Loop (num_trials)"]
+        TeacherGenerate --> CompileCandidate["Combine candidate instructions + few-shot traces"]
+        CompileCandidate --> ExecStudent["Execute candidates on Student model over Trainset"]
+        ExecStudent --> GradeCandidate["Calculate metric score (Structural + Similarity)"]
+        GradeCandidate --> SelectBest["Track best-performing prompt configuration"]
+    end
+    
+    SelectBest --> TestWinner["Evaluate winning prompt against Evalset"]
+    TestWinner --> SaveDSPy["Serialize compiled weights to dspy.json"]
+    TestWinner --> SaveOptimized["Write prompt.json replacement to optimized-prompt.json"]
+    TestWinner --> WriteReport["Generate optimization optimize-report.json"]
+    
+    WriteReport --> ApplyFlag{--apply flag set?}
+    ApplyFlag -- Yes --> OverwriteSource["Overwrite source prompt.json with winning instructions"]
+    ApplyFlag -- No --> End["End optimize"]
+    OverwriteSource --> End
 ```
 
-### Subcommands
+### Custom Optimizer Implementations
 
-| Command | Description | Key Arguments |
-| :--- | :--- | :--- |
-| `list-prompts` | Lists all prompts discovered in the prompts directory. | `--prompts-dir` |
-| `preview-schema` | Prints the Pydantic/JSON schema generated from a prompt. | `--prompts-dir`, `--prompt` |
-| `validate` | Runs evaluation cases against the Student model. | `--prompts-dir`, `--dataset`, `--prompt` |
-| `optimize` | Compiles and optimizes instructions via DSPy MIPROv2. | `--prompts-dir`, `--dataset`, `--prompt` |
-| `generate-golden-truth` | Creates empty skeleton boilerplates or LLM draft reference cases inside `golden-truth/`. | `--prompts-dir`, `--dataset-dir`, `--prompt`, `--case-id` |
-| `generate` | Generates a file from JSON using either a built-in language template or a custom Jinja template. | `--source`, `--target`, `-language` / `--language`, `-template` / `--template` |
+By default, prompt optimization uses the DSPy `MIPROv2` compiler. You can customize the optimization and compilation process by providing your own optimizer subclassing `BaseOptimizer`:
 
-### Runtime Arguments (validate / optimize)
+```python
+from prompt_better.dspy_manager import BaseOptimizer
 
-| Argument | Default | Description |
-| :--- | :--- | :--- |
-| `--auto` | `light` | DSPy auto mode for MIPROv2 (`light`, `medium`, `heavy`). |
-| `--num-threads` | `6` | Parallel evaluation threads. |
-| `--train-ratio` | `0.8` | Train/eval split ratio for datasets. |
-| `--apply` | (flag) | Write optimized prompts back to the source JSON files. |
+class CustomOptimizer(BaseOptimizer):
+    def compile(
+        self,
+        config,
+        spec,
+        specs,
+        student_lm,
+        teacher_lm,
+        trainset,
+        evalset,
+        metric,
+        module,
+    ):
+        # Implement custom compilation or training loops
+        ...
+        return compiled_module
+```
+
+#### Setting the Custom Optimizer
+
+You can configure the custom optimizer dynamically in three ways (resolved hierarchically):
+
+1. **CLI Flag**: Specify `--optimizer path.to.module:CustomOptimizer` or file path `path/to/script.py:CustomOptimizer` (or simply `path/to/script.py` which auto-detects the subclass).
+2. **Environment Variable**: `export PROMPT_BETTER_OPTIMIZER="path.to.module:CustomOptimizer"`
+3. **Global Config (`prompt-better.json`)**:
+   ```json
+   {
+     "optimizer": "path.to.module:CustomOptimizer"
+   }
+   ```
 
 ---
 
-## Gradle Pipeline (Optional)
+## 5. JSON Specifications & Schemas
 
-If your project uses Gradle for orchestration, the included `build.gradle.kts` wraps the Python CLI with Gradle tasks and provides sensible defaults:
+`prompt-better` uses three distinct JSON models.
 
-```bash
-# Setup virtual environment and install dependencies
-./gradlew install
+### A. Prompt Specification (`prompt.json`)
+Defines the name, model configs, dynamic placeholders (context), and structured outputs.
 
-# Run Python test suite
-./gradlew test
-
-# List all prompt specifications
-./gradlew list
-
-# Preview JSON schema for a prompt
-./gradlew previewSchema -PpromptOptimizationPrompt=MyPrompt
-
-# Validate a prompt
-./gradlew validate -PpromptOptimizationPrompt=MyPrompt
-
-# Optimize a prompt
-./gradlew optimize -PpromptOptimizationPrompt=MyPrompt
-
-# Generate Swift structs for all prompts
-./gradlew generateSwiftPrompts
-```
-
-The Gradle tasks read defaults from `build.gradle.kts` properties and pass them through to the CLI. Override paths with `-P` flags:
-
-```bash
-./gradlew validate \
-  -PpromptOptimizationPromptsDir=../prompts/ios/prompts \
-  -PpromptOptimizationPrompt=ArticleInsight
-```
-
-For Swift generation, the embedding project chooses the output directory and can use the built-in Swift template:
-
-```bash
-./gradlew generateSwiftPrompts \
-  -PpromptOptimizationPromptsDir=../prompts/ios/prompts \
-  -PpromptOptimizationSwiftOutputDir=../iosApp/iosApp/AI/Generated \
-  -PpromptOptimizationLanguage=swift
-```
-
-To override the built-in template, pass `-PpromptOptimizationTemplate=path/to/template.jinja2`.
-
----
-
-## Configuration & Environment Variables
-
-The framework reads settings from `config.json` (resolved from the parent of `--prompts-dir`) with environment variable overrides taking precedence.
-
-| Environment Variable | Description |
-| :--- | :--- |
-| **`PROMPT_BETTER_STUDENT_BASE_URL`** | API endpoint for the target Student model. |
-| **`PROMPT_BETTER_STUDENT_MODEL`** | Model identifier for the Student runtime. |
-| **`PROMPT_BETTER_STUDENT_API_KEY`** | Authentication key for the Student API. |
-| **`PROMPT_BETTER_TEACHER_BASE_URL`** | API endpoint for the Teacher model. |
-| **`PROMPT_BETTER_TEACHER_MODEL`** | Model identifier for the Teacher model. |
-| **`PROMPT_BETTER_TEACHER_API_KEY`** | Authentication key for the Teacher API. |
-| **`PROMPT_BETTER_NUM_THREADS`** | Maximum threads for parallel evaluations. |
-| **`PROMPT_BETTER_TRAIN_RATIO`** | Train/test split ratio (e.g. 0.8) for dataset partition. |
-| **`PROMPT_BETTER_DISABLE_CACHE`** | Set to `1` to bypass the SQLite response caching layer for JSON schema calls. |
-
-> **Precedence:** Environment variables > `config.json` > CLI defaults.  
-> **Local dev servers** (`localhost` / `127.0.0.1`) don't require an API key.
-
----
-
-## JSON Specification Schema
-
-See `prompt-schema.json` for the full JSON Schema. Here is a representative example:
-
+*   **Schema Location**: [prompt-schema.json](prompt_better/prompt_json/prompt-schema.json)
+*   **JSON Schema**:
 ```json
 {
-  "name": "TranslationPrompt",
-  "metadata": {
-    "version": "1.0.0",
-    "author": "Core AI Team"
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Prompt Definition",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "description": "Unique identifier for the prompt." },
+    "instructions": {
+      "type": "object",
+      "properties": {
+        "prompt": { "type": "string", "description": "The system instructions or template for the model." },
+        "context": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "type": { "type": "string", "enum": ["string", "integer", "number", "boolean", "array"] },
+              "desc": { "type": "string" }
+            },
+            "required": ["name", "type", "desc"]
+          }
+        }
+      },
+      "required": ["prompt", "context"]
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "model_id": { "type": "string" },
+        "temperature": { "type": "number" },
+        "top_p": { "type": "number" },
+        "top_k": { "type": "integer" },
+        "max_tokens": { "type": "integer" },
+        "stop_sequences": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["string", "integer", "number", "boolean", "array"] },
+          "items": { "type": "string" },
+          "desc": { "type": "string" }
+        },
+        "required": ["name", "type", "desc"]
+      }
+    }
   },
+  "required": ["name", "instructions", "outputs"]
+}
+```
+*   **Example Specification**:
+```json
+{
+  "name": "TopicClassifierPrompt",
   "config": {
-    "model_id": "base",
-    "temperature": 0.1,
-    "top_p": 1.0,
-    "top_k": 1,
-    "max_tokens": 1000,
-    "stop_sequences": []
+    "temperature": 0.0,
+    "max_tokens": 100
   },
   "instructions": {
-    "prompt": "Translate this text into the target language:\n\nLanguage: {{target_language}}\nText: {{text}}",
+    "prompt": "Classify the topic of the following text.\n\nText: {{text}}",
     "context": [
       {
         "name": "text",
         "type": "string",
-        "desc": "The source text to translate."
-      },
-      {
-        "name": "target_language",
-        "type": "string",
-        "desc": "The destination language."
+        "desc": "The raw input text to analyze."
       }
     ]
   },
   "outputs": [
     {
-      "name": "translated_text",
+      "name": "topic",
       "type": "string",
-      "desc": "The translated result."
-    },
-    {
-      "name": "detected_source_language",
-      "type": "string",
-      "desc": "The language detected in the source text."
+      "desc": "Must be one of: Politics, Sports, Technology, Science, Entertainment."
     }
   ]
 }
 ```
 
-At runtime, this JSON translates instantly into a Pydantic model with fields `translated_text` and `detected_source_language`, enforcing strict, type-safe outputs when executing optimizations or baseline runs.
+---
+
+### B. Dataset Case Specification (`caseX.json`)
+Defines the inputs mapped to prompt placeholders, and optional conversation history messages.
+
+> [!TIP]
+> For a deeper dive into dataset design and curation, we recommend reading **Chapter 8. Dataset Engineering** in the book **"AI Engineering - Building Application with Foundation Models"** by **Chip Huyen** (O'Reilly).
+
+*   **Schema Location**: [dataset-schema.json](prompt_better/dataset_manager/dataset-schema.json)
+*   **JSON Schema**:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Dataset Case Definition",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "Unique identifier for this test case." },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Key-value mapping of input placeholders to values."
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": { "type": "string", "enum": ["user", "assistant", "system"] },
+          "content": { "type": "string" },
+          "prompt_name": { "type": "string" },
+          "inputs": { "type": "object", "additionalProperties": { "type": "string" } }
+        },
+        "required": ["role"]
+      }
+    }
+  },
+  "required": ["inputs"]
+}
+```
+*   **Example Payload** (`dataset/case1.json`):
+```json
+{
+  "id": "case1",
+  "inputs": {
+    "text": "Mars rover successfully collects rock sample."
+  }
+}
+```
+
+---
+
+### C. Golden Truth Reference Specification (`caseX.json` next to dataset cases)
+Defines expected ground truth values and human-written grading rubrics.
+
+*   **Schema Location**: [golden-schema.json](prompt_better/dataset_manager/golden-schema.json)
+*   **JSON Schema**:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Golden Truth Definition",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string", "description": "Unique identifier matching the test case." },
+    "reference_output": {
+      "type": "object",
+      "description": "Expected structured output key-value mapping."
+    },
+    "rubric": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Quality criteria for evaluation."
+    }
+  },
+  "required": ["reference_output"]
+}
+```
+*   **Example Payload** (`golden-truth/case1.json`):
+```json
+{
+  "reference_output": {
+    "topic": "Science"
+  },
+  "rubric": [
+    "The output topic must be exactly Science."
+  ]
+}
+```
+
+---
+
+## 6. References
+
+### CLI Subcommands Reference
+
+| Command | Description | Key Arguments |
+| :--- | :--- | :--- |
+| `list-prompts` | Scans for prompt specifications inside the target directory. | `--prompts-dir` |
+| `preview-schema` | Emits the parsed Pydantic schema structure derived from the spec. | `--prompts-dir`, `--prompt` |
+| `validate-spec` | Runs validator checks on prompt JSONs against `prompt-schema.json`. | `--prompts-dir` |
+| `validate` | Runs evaluation cases against the Student model. | `--prompts-dir`, `--prompt`, `--dataset`, `--student-temperature`, `--teacher-eval-temperature` |
+| `optimize` | Compiles and optimizes instructions via DSPy MIPROv2. | `--prompts-dir`, `--prompt`, `--dataset`, `--student-temperature`, `--teacher-temperature`, `--teacher-eval-temperature`, `--eval-cases-only`, `--optimizer` |
+| `generate-golden-truth` | Generates placeholder schemas inside the target `golden-truth/` path. | `--prompts-dir`, `--dataset-dir`, `--prompt`, `--case-id`, `--teacher-temperature` |
+| `generate` | Compiles Swift class structs conformant to `AIPromptCore`. | `--source`, `--target`, `--language swift` |
+
+### Environment Variables
+
+*   `PROMPT_BETTER_STUDENT_BASE_URL`: API root for student completions (e.g. Vapor server: `http://localhost:8080/v1`).
+*   `PROMPT_BETTER_STUDENT_MODEL`: Model ID identifier (e.g. `apple-intelligence`).
+*   `PROMPT_BETTER_STUDENT_API_KEY`: Key used for authentication (optional/blank for localhost).
+*   `PROMPT_BETTER_STUDENT_TEMPERATURE`: Default temperature for student model completion calls (defaults to `0.2`).
+*   `PROMPT_BETTER_TEACHER_BASE_URL`: API root for the cloud teacher model (e.g. `https://api.openai.com/v1`).
+*   `PROMPT_BETTER_TEACHER_MODEL`: Teacher model ID (e.g. `gpt-4o`).
+*   `PROMPT_BETTER_TEACHER_API_KEY`: API token authorization key.
+*   `PROMPT_BETTER_TEACHER_TEMPERATURE`: General/MIPRO temperature for the teacher model when proposing prompt variations and creating samples (defaults to `0.2`).
+*   `PROMPT_BETTER_TEACHER_EVAL_TEMPERATURE`: Validation/eval temperature for the teacher model when grading/evaluating candidate outputs (defaults to `0.0` as recommended).
+*   `PROMPT_BETTER_OPTIMIZER`: Import path or file path to custom Optimizer class, or built-in modes: `"chain-of-thought"` (default) or `"predict"`.
+
+### Scenario-Specific CLI Presets
+
+#### On-Device & Local Silicon Testing
+Run evaluations sequentially to avoid core contention, disable token budget validations, and disable Chain-of-Thought formatting constraints for schema-guided output targets:
+```bash
+python3 -m prompt_better.cli optimize \
+  --prompts-dir ./prompts \
+  --prompt MyPrompt \
+  --num-threads 1 \
+  --no-requires-permission-to-run \
+  --optimizer predict
+```
+
+
+#### Multi-threaded Cloud Pipelines
+Speed up calls over remote APIs by increasing parallel compilation threads:
+```bash
+python3 -m prompt_better.cli optimize \
+  --prompts-dir ./prompts \
+  --prompt MyPrompt \
+  --num-threads 8 \
+  --auto medium
+```
+
+### Gradle Pipeline Reference
+For developers using Gradle, wrapper tasks are available in `build.gradle.kts`:
+*   `./gradlew list`: Show prompt lists.
+*   `./gradlew validate -PpromptOptimizationPrompt=<Name>`: Validate the given prompt.
+*   `./gradlew optimize -PpromptOptimizationPrompt=<Name>`: Run MIPROv2 optimizer.
+*   `./gradlew generateSwiftPrompts`: Make Swift files.
+
+### iOS Integration Setup (`AIPromptCore`)
+See [AIPromptCore Framework](frameworks/AIPromptCore) for details.
+
+> [!NOTE]
+> Using the `AIPromptCore` framework is recommended to ensure exactly the same execution interface (parameters, parsing, and call structures) to the Apple foundational model as used during optimization. However, it is not strictly required; you can extract the optimized instruction text from the results JSON files and run them in any custom LLM setup.
+
+1.  Compile Swift targets to framework binaries:
+    ```bash
+    cd frameworks/AIPromptCore && ./build_xcframework.sh
+    ```
+2.  Link the binary or package reference into your application project (`Package.swift`):
+    ```swift
+    .package(path: "path/to/prompt-better/frameworks/AIPromptCore")
+    ```
+3.  Include generated `@Generable` Swift structs:
+    ```bash
+    python3 -m prompt_better.cli generate \
+      --source example/prompts/TopicClassifier/results/optimized-prompt.json \
+      --target example/prompts/TopicClassifier/results/TopicClassifierPrompt.swift \
+      --language swift
+    ```
+
+### Books & Literature
+
+*   **AI Engineering - Building Application with Foundation Models** by *Chip Huyen* (O'Reilly)
+    *   Chapter 4. Evaluate AI Systems
+    *   Chapter 5. Prompt Engineering
+    *   Chapter 8. Dataset Engineering
+
+

@@ -99,14 +99,14 @@
           "enum": ["string", "integer", "number", "boolean", "array"]
         },
         "items": {
-          "type": "string",
+          "type": ["string", "null"],
           "description": "Type of items in case of an array (usually 'string')."
         },
         "min_count": {
-          "type": "integer"
+          "type": ["integer", "null"]
         },
         "max_count": {
-          "type": "integer"
+          "type": ["integer", "null"]
         },
         "desc": {
           "type": "string",

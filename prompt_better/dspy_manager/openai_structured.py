@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-import sqlite3
-import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -301,96 +298,6 @@ def try_parse_raw_text_to_schema(content: str, json_schema: Dict[str, Any]) -> D
     return coerce_types_to_schema(result, json_schema)
 
 
-# MARK: - Hashing-based SQLite Response Cache
-
-class ResponseCache:
-    """Manages an SQLite database that caches LLM JSON schema responses based on request properties."""
-    def __init__(self, db_path: Optional[str] = None):
-        if db_path is None:
-            db_path = str(Path.cwd() / ".prompt_better_cache.db")
-        self.db_path = db_path
-        self._init_db()
-
-    def _init_db(self):
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS cache (
-                        key TEXT PRIMARY KEY,
-                        response TEXT,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """
-                )
-        except Exception as e:
-            print(f"Warning: Failed to initialize SQLite cache at {self.db_path}: {e}")
-
-    def _compute_key(
-        self,
-        config_model: str,
-        messages: List[Dict[str, str]],
-        json_schema: Dict[str, Any],
-        temperature: float
-    ) -> str:
-        payload = {
-            "model": config_model,
-            "messages": messages,
-            "schema": json_schema,
-            "temperature": temperature,
-        }
-        serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
-        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-
-    def get(
-        self,
-        config_model: str,
-        messages: List[Dict[str, str]],
-        json_schema: Dict[str, Any],
-        temperature: float
-    ) -> Optional[Dict[str, Any]]:
-        key = self._compute_key(config_model, messages, json_schema, temperature)
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT response FROM cache WHERE key = ?", (key,))
-                row = cursor.fetchone()
-                if row:
-                    return json.loads(row[0])
-        except Exception as e:
-            print(f"Warning: Failed to read from SQLite cache: {e}")
-        return None
-
-    def set(
-        self,
-        config_model: str,
-        messages: List[Dict[str, str]],
-        json_schema: Dict[str, Any],
-        temperature: float,
-        response: Dict[str, Any]
-    ):
-        key = self._compute_key(config_model, messages, json_schema, temperature)
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.execute(
-                    "INSERT OR REPLACE INTO cache (key, response) VALUES (?, ?)",
-                    (key, json.dumps(response, ensure_ascii=False)),
-                )
-        except Exception as e:
-            print(f"Warning: Failed to write to SQLite cache: {e}")
-
-
-_cache_instance = None
-
-def get_cache() -> Optional[ResponseCache]:
-    global _cache_instance
-    if os.getenv("PROMPT_BETTER_DISABLE_CACHE") == "1":
-        return None
-    if _cache_instance is None:
-        _cache_instance = ResponseCache()
-    return _cache_instance
-
-
 # MARK: - OpenAI Client Completion Core
 
 def create_openai_client(config: EndpointConfig):
@@ -401,9 +308,12 @@ def create_openai_client(config: EndpointConfig):
             "The `openai` Python package is not installed. Run `./gradlew promptOptimizationInstall` first."
         ) from exc
 
+    api_key = config.api_key
+    if not api_key:
+        api_key = "local"
     return OpenAI(
         base_url=config.base_url,
-        api_key=config.api_key,
+        api_key=api_key,
         timeout=config.timeout_seconds,
     )
 
@@ -412,22 +322,15 @@ def call_json_schema(
     config: EndpointConfig,
     messages: List[Dict[str, str]],
     json_schema: Dict[str, Any],
-    temperature: float = 0.0,
+    temperature: Optional[float] = None,
 ) -> Dict[str, Any]:
-    # 1. Intercept with local SQLite response cache
-    cache = get_cache()
-    if cache is not None:
-        cached = cache.get(config.model, messages, json_schema, temperature)
-        if cached is not None:
-            print(f"  [Cache Hit] Response resolved from SQLite cache ({config.model}).")
-            return cached
-
-    # 2. Invoke actual completion endpoint
+    # 1. Invoke actual completion endpoint
     client = create_openai_client(config)
+    temp_to_use = temperature if temperature is not None else config.temperature
     response = client.chat.completions.create(
         model=config.model,
         messages=messages,
-        temperature=temperature,
+        temperature=temp_to_use,
         response_format={
             "type": "json_schema",
             "json_schema": json_schema,
@@ -458,10 +361,6 @@ def call_json_schema(
                 raise StructuredOutputError(
                     f"Invalid JSON output: {content}. Fallback parser failed: {fallback_exc}"
                 ) from exc
-
-    # 3. Store result in cache if successful
-    if cache is not None and result:
-        cache.set(config.model, messages, json_schema, temperature, result)
 
     return result
 
