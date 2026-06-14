@@ -16,7 +16,12 @@ TEMPLATES_DIR = Path(__file__).parent / "prompt_json" / "templates"
 
 def main() -> None:
     try:
-        parser = argparse.ArgumentParser(description="Prompt optimization CLI")
+        parser = argparse.ArgumentParser(
+            description=(
+                "Prompt optimization CLI. Configure via command-line arguments, "
+                "prompt-better.json, or PROMPT_BETTER_* environment variables."
+            )
+        )
         subparsers = parser.add_subparsers(dest="command", required=True)
 
         list_parser = subparsers.add_parser("list-prompts", help="List prompts defined in JSON files.")
@@ -80,6 +85,14 @@ def main() -> None:
                 teacher_api_key = args.teacher_api_key.strip()
             else:
                 teacher_api_key = os.getenv("PROMPT_BETTER_TEACHER_API_KEY", "").strip()
+
+            if not teacher_base_url:
+                raise SystemExit("Error: Teacher base URL is not set. Set it via prompt-better.json or PROMPT_BETTER_TEACHER_BASE_URL.")
+            if not teacher_model:
+                raise SystemExit("Error: Teacher model is not set. Set it via prompt-better.json or PROMPT_BETTER_TEACHER_MODEL.")
+            # Allow blank API key for local dev servers
+            if not teacher_api_key and not (teacher_base_url.startswith("http://localhost") or teacher_base_url.startswith("http://127.0.0.1")):
+                raise SystemExit("Error: Teacher API Key is required for remote endpoints.")
             
             env_teacher_temp = os.getenv("PROMPT_BETTER_TEACHER_TEMPERATURE")
             cli_teacher_temp = getattr(args, "teacher_temperature", None)
@@ -90,14 +103,21 @@ def main() -> None:
             else:
                 teacher_temperature = 0.2
 
-            teacher = None
-            if teacher_base_url and teacher_model and teacher_api_key:
-                teacher = EndpointConfig(
-                    base_url=teacher_base_url,
-                    model=teacher_model,
-                    api_key=teacher_api_key,
-                    temperature=teacher_temperature,
-                )
+            teacher = EndpointConfig(
+                base_url=teacher_base_url,
+                model=teacher_model,
+                api_key=teacher_api_key,
+                temperature=teacher_temperature,
+            )
+
+            # Validate connection
+            print(f"Validating connection to teacher model ({teacher.model} at {teacher.base_url})...")
+            try:
+                from prompt_better.dspy_manager.optimizer import validate_endpoint_connection
+                validate_endpoint_connection(teacher, name="Teacher")
+                print("Teacher model connection validated successfully.")
+            except Exception as exc:
+                raise SystemExit(f"Error: {exc}")
                 
             generate_golden_truth(
                 case_file=case_file,
@@ -171,33 +191,88 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
     _add_common_file_args(parser)
     parser.add_argument("--dataset", required=False, default=None, help="Path to the optimization dataset JSON or directory.")
     parser.add_argument("--prompt", required=True, help="Prompt name or ALL.")
-    parser.add_argument("--auto", default=None, help="DSPy auto mode for MIPROv2 (default: light).")
-    parser.add_argument("--num-threads", type=int, default=None, help="DSPy optimization threads (default: 6).")
-    parser.add_argument("--train-ratio", type=float, default=None, help="Train/eval split ratio (default: 0.8).")
+    parser.add_argument(
+        "--auto",
+        default=None,
+        help="DSPy auto mode for MIPROv2 (default: light). Env: PROMPT_BETTER_AUTO_MODE"
+    )
+    parser.add_argument(
+        "--num-threads",
+        type=int,
+        default=None,
+        help="DSPy optimization threads (default: 6). Env: PROMPT_BETTER_NUM_THREADS"
+    )
+    parser.add_argument(
+        "--train-ratio",
+        type=float,
+        default=None,
+        help="Train/eval split ratio (default: 0.8). Env: PROMPT_BETTER_TRAIN_RATIO"
+    )
     parser.add_argument("--apply", action="store_true", help="Apply optimized prompts back to their source JSON definitions.")
-    parser.add_argument("--student-api-key", default=None, help="API key for the student endpoint.")
-    parser.add_argument("--teacher-api-key", default=None, help="API key for the teacher endpoint.")
-    parser.add_argument("--student-temperature", type=float, default=None, help="Temperature for the student endpoint (default: 0.2).")
-    parser.add_argument("--teacher-temperature", type=float, default=None, help="MIPRO temperature for the teacher endpoint (default: 0.2).")
-    parser.add_argument("--teacher-eval-temperature", type=float, default=None, help="Validation temperature for the teacher endpoint (default: 0.0).")
+    parser.add_argument(
+        "--student-api-key",
+        default=None,
+        help="API key for the student endpoint. Env: PROMPT_BETTER_STUDENT_API_KEY"
+    )
+    parser.add_argument(
+        "--teacher-api-key",
+        default=None,
+        help="API key for the teacher endpoint. Env: PROMPT_BETTER_TEACHER_API_KEY"
+    )
+    parser.add_argument(
+        "--student-temperature",
+        type=float,
+        default=None,
+        help="Temperature for the student endpoint (default: 0.2). Env: PROMPT_BETTER_STUDENT_TEMPERATURE"
+    )
+    parser.add_argument(
+        "--teacher-temperature",
+        type=float,
+        default=None,
+        help="MIPRO temperature for the teacher endpoint (default: 0.2). Env: PROMPT_BETTER_TEACHER_TEMPERATURE"
+    )
+    parser.add_argument(
+        "--teacher-eval-temperature",
+        type=float,
+        default=None,
+        help="Validation temperature for the teacher endpoint (default: 0.0). Env: PROMPT_BETTER_TEACHER_EVAL_TEMPERATURE"
+    )
     
     # Advanced optimization settings
     parser.add_argument(
         "--requires-permission-to-run",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Ask for confirmation of estimated token costs before running DSPy optimization (default: True)."
+        help="Ask for confirmation of estimated token costs before running DSPy optimization (default: True). Env: PROMPT_BETTER_REQUIRES_PERMISSION_TO_RUN"
     )
-    parser.add_argument("--num-trials", type=int, default=None, help="Direct override for num_trials in MIPROv2 compile.")
+    parser.add_argument(
+        "--num-trials",
+        type=int,
+        default=None,
+        help="Direct override for num_trials in MIPROv2 compile. Env: PROMPT_BETTER_NUM_TRIALS"
+    )
     parser.add_argument(
         "--minibatch",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Controls the minibatch parameter in MIPROv2 compile."
+        help="Controls the minibatch parameter in MIPROv2 compile. Env: PROMPT_BETTER_MINIBATCH"
     )
-    parser.add_argument("--num-candidates", type=int, default=None, help="Controls the num_candidates configuration in MIPROv2 constructor.")
-    parser.add_argument("--evaluator", default=None, help="Import path or file path to custom Evaluator class.")
-    parser.add_argument("--optimizer", default=None, help="Import path or file path to custom Optimizer class.")
+    parser.add_argument(
+        "--num-candidates",
+        type=int,
+        default=None,
+        help="Controls the num_candidates configuration in MIPROv2 constructor. Env: PROMPT_BETTER_NUM_CANDIDATES"
+    )
+    parser.add_argument(
+        "--evaluator",
+        default=None,
+        help="Import path or file path to custom Evaluator class. Env: PROMPT_BETTER_EVALUATOR"
+    )
+    parser.add_argument(
+        "--optimizer",
+        default=None,
+        help="Import path or file path to custom Optimizer class. Env: PROMPT_BETTER_OPTIMIZER"
+    )
     parser.add_argument(
         "--eval-cases-only",
         action="store_true",

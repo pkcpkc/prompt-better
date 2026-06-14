@@ -15,7 +15,7 @@ class EndpointConfig(BaseModel):
 
 class OptimizationConfig(BaseModel):
     student: EndpointConfig
-    teacher: EndpointConfig
+    teacher: Optional[EndpointConfig] = None
     prompts_dir: Path
     dataset_file: Path
     prompt_name: str

@@ -53,9 +53,10 @@ class BaseEvaluator:
         candidate: Dict[str, Any],
         specs: Dict[str, Any],
         config: OptimizationConfig,
-    ) -> Tuple[float, str]:
+    ) -> Tuple[Optional[float], Optional[str]]:
         """Fetch a semantic grade from a high-capacity Teacher model."""
-        assert config.teacher is not None
+        if config.teacher is None:
+            return None, "Teacher model not configured."
         judge_schema = {
             "name": "prompt_grade",
             "strict": True,
@@ -132,13 +133,16 @@ class BaseEvaluator:
             return score, rationale
         except StructuredOutputError as exc:
             return 0.0, f"Teacher grading failed: {exc}"
+        except Exception as exc:
+            print(f"Warning: Teacher connection/call failed: {exc}. Ignoring teacher score.", file=sys.stderr)
+            return None, f"Teacher connection failed: {exc}"
 
     def aggregate_score(
         self,
         spec: Any,
         structural: float,
         similarity: float,
-        teacher_score: float,
+        teacher_score: Optional[float],
     ) -> float:
         """Combine structural, similarity, and teacher scores into a single aggregate score."""
         struct_w, sim_w = self._get_weights(spec)
@@ -147,6 +151,8 @@ class BaseEvaluator:
         else:
             aggregate = (struct_w * structural) + (sim_w * similarity)
         
+        if teacher_score is None:
+            return aggregate
         return (aggregate + teacher_score) / 2
 
     def dspy_score(self, spec: Any, reference: Dict[str, Any], candidate: Dict[str, Any]) -> float:

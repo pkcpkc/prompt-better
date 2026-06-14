@@ -179,6 +179,73 @@ class EvaluatorTests(unittest.TestCase):
         dspy_score_ok = evaluator.dspy_score(spec, {"field1": "hello"}, {"field1": "hello"})
         self.assertEqual(dspy_score_ok, 1.0)
 
+    def test_teacher_score_not_configured(self) -> None:
+        from prompt_better.dspy_manager import OptimizationConfig, EndpointConfig
+        spec = PromptSpec(
+            name="TestPrompt",
+            instructions=InstructionsSpec(prompt="Template", context=[]),
+            outputs=[PromptFieldSpec(name="field1", type="string", desc="f1")]
+        )
+        class DummyExample:
+            example_id = "case1"
+            inputs = {}
+            reference_output = {}
+            rubric = []
+            history = []
+
+        config = OptimizationConfig(
+            student=EndpointConfig(base_url="http://localhost", model="m", api_key="k"),
+            teacher=None,
+            prompts_dir=Path("."),
+            dataset_file=Path("."),
+            prompt_name="ALL"
+        )
+        evaluator = DefaultEvaluator()
+        score, rationale = evaluator.teacher_score(spec, DummyExample(), {}, {}, config)
+        self.assertIsNone(score)
+        self.assertEqual(rationale, "Teacher model not configured.")
+
+    def test_teacher_score_connection_failure(self) -> None:
+        from unittest.mock import patch
+        from prompt_better.dspy_manager import OptimizationConfig, EndpointConfig
+        spec = PromptSpec(
+            name="TestPrompt",
+            instructions=InstructionsSpec(prompt="Template", context=[]),
+            outputs=[PromptFieldSpec(name="field1", type="string", desc="f1")]
+        )
+        class DummyExample:
+            example_id = "case1"
+            inputs = {}
+            reference_output = {}
+            rubric = []
+            history = []
+
+        config = OptimizationConfig(
+            student=EndpointConfig(base_url="http://localhost", model="m", api_key="k"),
+            teacher=EndpointConfig(base_url="http://localhost", model="m2", api_key="k"),
+            prompts_dir=Path("."),
+            dataset_file=Path("."),
+            prompt_name="ALL"
+        )
+        evaluator = DefaultEvaluator()
+        with patch("prompt_better.dspy_manager.evaluator.call_json_schema", side_effect=RuntimeError("connection error")):
+            score, rationale = evaluator.teacher_score(spec, DummyExample(), {}, {}, config)
+            self.assertIsNone(score)
+            self.assertTrue(rationale.startswith("Teacher connection failed"))
+
+    def test_aggregate_score_with_none_teacher(self) -> None:
+        spec = PromptSpec(
+            name="TestPrompt",
+            instructions=InstructionsSpec(prompt="Template", context=[]),
+            outputs=[PromptFieldSpec(name="field1", type="string", desc="f1")]
+        )
+        evaluator = DefaultEvaluator()
+        # structural = 1.0, similarity = 1.0, structural_weight=0.55, similarity_weight=0.45
+        # student aggregate = 0.55 * 1.0 + 0.45 * 1.0 = 1.0
+        # If teacher is None, aggregate_score should return student aggregate = 1.0
+        score = evaluator.aggregate_score(spec, 1.0, 1.0, None)
+        self.assertEqual(score, 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

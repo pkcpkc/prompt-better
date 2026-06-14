@@ -19,7 +19,7 @@ from prompt_better.dataset_manager import (
     flatten_history,
     token_f1,
 )
-from .models import OptimizationConfig, ValidationResult
+from .models import EndpointConfig, OptimizationConfig, ValidationResult
 from .openai_structured import StructuredOutputError, call_json_schema
 from .evaluator import load_evaluator
 from .optimizers import load_optimizer
@@ -68,6 +68,23 @@ def validate_prompt(config: OptimizationConfig) -> Dict[str, Any]:
     return report
 
 
+def validate_endpoint_connection(config: EndpointConfig, name: str = "Teacher") -> None:
+    """Verifies that we can successfully connect to the endpoint."""
+    try:
+        from prompt_better.dspy_manager.openai_structured import create_openai_client
+        client = create_openai_client(config)
+        client.chat.completions.create(
+            model=config.model,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+        )
+    except Exception as exc:
+        raise PromptOptimizationError(
+            f"Connection validation failed for {name} model endpoint ({config.model} at {config.base_url}). "
+            f"Details: {exc}"
+        )
+
+
 def optimize_prompt(config: OptimizationConfig) -> Dict[str, Any]:
     try:
         import dspy
@@ -75,6 +92,23 @@ def optimize_prompt(config: OptimizationConfig) -> Dict[str, Any]:
         raise PromptOptimizationError(
             "DSPy is not installed. Install the package dependencies (e.g., `uv pip install -e .` or `pip install -e .`)."
         ) from exc
+
+    if config.teacher is None:
+        raise PromptOptimizationError(
+            "Teacher model configuration is missing or incomplete, but is required for optimization. "
+            "Please configure the teacher base URL and model via prompt-better.json or "
+            "environment variables (PROMPT_BETTER_TEACHER_BASE_URL, PROMPT_BETTER_TEACHER_MODEL)."
+        )
+
+    # Validate remote API key if required
+    teacher_conf = config.teacher
+    if not teacher_conf.api_key and not (teacher_conf.base_url.startswith("http://localhost") or teacher_conf.base_url.startswith("http://127.0.0.1")):
+        raise PromptOptimizationError("Teacher API Key is required for remote endpoints.")
+
+    # Validate teacher connection
+    print(f"Validating connection to teacher model ({teacher_conf.model} at {teacher_conf.base_url})...")
+    validate_endpoint_connection(teacher_conf, name="Teacher")
+    print("Teacher model connection validated successfully.")
 
     specs = load_prompt_specs(config.prompts_dir)
     examples = load_examples(config.dataset_file)
@@ -420,7 +454,7 @@ def _validate_single_example(
         structural_score=round(structural, 4),
         similarity_score=round(similarity, 4),
         aggregate_score=round(aggregate, 4),
-        teacher_score=round(teacher_score, 4),
+        teacher_score=round(teacher_score, 4) if teacher_score is not None else None,
         teacher_rationale=teacher_rationale,
     )
 
@@ -456,7 +490,7 @@ def _score_with_teacher_on_eval(
                 structural_score=round(structural, 4),
                 similarity_score=round(similarity, 4),
                 aggregate_score=round(aggregate, 4),
-                teacher_score=round(teacher_score, 4),
+                teacher_score=round(teacher_score, 4) if teacher_score is not None else None,
                 teacher_rationale=teacher_rationale,
             )
         )

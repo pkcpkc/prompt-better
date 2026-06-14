@@ -375,6 +375,31 @@ class ConfigTests(unittest.TestCase):
             temperature=0.7
         )
 
+    def test_build_runtime_config_without_teacher(self) -> None:
+        self.write_config({
+            "student": {
+                "base_url": "http://localhost:8080/v1",
+                "model": "student-model"
+            }
+        })
+        args = MockArgs(prompts_dir=str(self.prompts_dir))
+        config = _build_runtime_config(args)
+        self.assertIsNone(config.teacher)
+
+    def test_optimize_prompt_raises_when_no_teacher(self) -> None:
+        from prompt_better.dspy_manager.optimizer import optimize_prompt, PromptOptimizationError
+        self.write_config({
+            "student": {
+                "base_url": "http://localhost:8080/v1",
+                "model": "student-model"
+            }
+        })
+        args = MockArgs(prompts_dir=str(self.prompts_dir))
+        config = _build_runtime_config(args)
+        with self.assertRaises(PromptOptimizationError) as ctx:
+            optimize_prompt(config)
+        self.assertIn("Teacher model configuration is missing", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -90,8 +90,9 @@ if [ -z "${PROMPT_BETTER_TEACHER_API_KEY:-}" ]; then
         export PROMPT_BETTER_TEACHER_API_KEY="$KEYCHAIN_VAL"
         echo "Loaded PROMPT_BETTER_TEACHER_API_KEY from macOS Keychain."
     else
-        echo "Error: PROMPT_BETTER_TEACHER_API_KEY not found in environment or macOS Keychain (Service: $TEACHER_KEYCHAIN_SERVICE, Account: $TEACHER_KEYCHAIN_ACCOUNT)." >&2
-        exit 1
+        echo "Warning: PROMPT_BETTER_TEACHER_API_KEY not found in environment or macOS Keychain."
+        echo "Step 1 (baseline validation) will still run (needs student model only)."
+        echo "Step 2 & 3 (optimization & conversion) will be skipped."
     fi
 fi
 
@@ -136,33 +137,44 @@ echo "Step 1: Running baseline validation for TopicClassifierPrompt..."
   --prompt TopicClassifierPrompt \
   --no-requires-permission-to-run
 
-echo ""
-echo "Step 2: Running optimization for TopicClassifierPrompt..."
-# Optimize the prompt. The optimizer mode is configured in example/prompt-better.json as "optimizer": "predict".
-# This compiles with dspy.Predict, which is required for macOS/iOS schema-guided structured outputs.
-"${PYTHON_CMD[@]}" -m prompt_better.cli optimize \
-  --prompts-dir example/prompts \
-  --prompt TopicClassifierPrompt \
-  --no-requires-permission-to-run
-
-
-
-
-echo ""
-echo "Step 3: Converting optimized JSON prompt specification to Swift..."
-"${PYTHON_CMD[@]}" -m prompt_better.cli generate \
-  --source example/prompts/TopicClassifier/results/optimized-prompt.json \
-  --target example/prompts/TopicClassifier/results/TopicClassifierPrompt.swift \
-  --language swift
-
-# Clean up/stop the local bridge now that Step 3 is complete
-if [ -n "$BRIDGE_PID" ]; then
+if [ -n "${PROMPT_BETTER_TEACHER_API_KEY:-}" ]; then
     echo ""
-    echo "Stopping macOS bridge (PID $BRIDGE_PID)..."
-    kill "$BRIDGE_PID" 2>/dev/null || true
-    wait "$BRIDGE_PID" 2>/dev/null || true
-    BRIDGE_PID=""
-fi
+    echo "Step 2: Running optimization for TopicClassifierPrompt..."
+    # Optimize the prompt. The optimizer mode is configured in example/prompt-better.json as "optimizer": "predict".
+    # This compiles with dspy.Predict, which is required for macOS/iOS schema-guided structured outputs.
+    "${PYTHON_CMD[@]}" -m prompt_better.cli optimize \
+      --prompts-dir example/prompts \
+      --prompt TopicClassifierPrompt \
+      --no-requires-permission-to-run
 
-echo ""
-echo "Successfully generated: example/prompts/TopicClassifier/results/TopicClassifierPrompt.swift"
+    echo ""
+    echo "Step 3: Converting optimized JSON prompt specification to Swift..."
+    "${PYTHON_CMD[@]}" -m prompt_better.cli generate \
+      --source example/prompts/TopicClassifier/results/optimized-prompt.json \
+      --target example/prompts/TopicClassifier/results/TopicClassifierPrompt.swift \
+      --language swift
+
+    # Clean up/stop the local bridge now that Step 3 is complete
+    if [ -n "$BRIDGE_PID" ]; then
+        echo ""
+        echo "Stopping macOS bridge (PID $BRIDGE_PID)..."
+        kill "$BRIDGE_PID" 2>/dev/null || true
+        wait "$BRIDGE_PID" 2>/dev/null || true
+        BRIDGE_PID=""
+    fi
+
+    echo ""
+    echo "Successfully generated: example/prompts/TopicClassifier/results/TopicClassifierPrompt.swift"
+else
+    # Clean up/stop the local bridge now that Step 1 is complete
+    if [ -n "$BRIDGE_PID" ]; then
+        echo ""
+        echo "Stopping macOS bridge (PID $BRIDGE_PID)..."
+        kill "$BRIDGE_PID" 2>/dev/null || true
+        wait "$BRIDGE_PID" 2>/dev/null || true
+        BRIDGE_PID=""
+    fi
+
+    echo ""
+    echo "Step 2 & 3 skipped because PROMPT_BETTER_TEACHER_API_KEY is not set."
+fi

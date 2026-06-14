@@ -110,21 +110,15 @@ def build_runtime_config(args: argparse.Namespace) -> OptimizationConfig:
         cfg_eval_temp = teacher_json.get("eval_temperature")
         teacher_eval_temperature = float(cfg_eval_temp) if cfg_eval_temp is not None else 0.0
 
-    if not teacher_base_url:
-        raise SystemExit("Error: Teacher base URL is not set. Set it via prompt-better.json or PROMPT_BETTER_TEACHER_BASE_URL.")
-    if not teacher_model:
-        raise SystemExit("Error: Teacher model is not set. Set it via prompt-better.json or PROMPT_BETTER_TEACHER_MODEL.")
-    # Allow blank API key for local dev servers
-    if not teacher_api_key and not (teacher_base_url.startswith("http://localhost") or teacher_base_url.startswith("http://127.0.0.1")):
-        raise SystemExit("Error: Teacher API Key is required for remote endpoints.")
-
-    teacher = EndpointConfig(
-        base_url=teacher_base_url,
-        model=teacher_model,
-        api_key=teacher_api_key,
-        temperature=teacher_temperature,
-        eval_temperature=teacher_eval_temperature,
-    )
+    teacher = None
+    if teacher_base_url and teacher_model:
+        teacher = EndpointConfig(
+            base_url=teacher_base_url,
+            model=teacher_model,
+            api_key=teacher_api_key,
+            temperature=teacher_temperature,
+            eval_temperature=teacher_eval_temperature,
+        )
 
     # Standard settings resolution (Precedence: Env > CLI > prompt-better.json > default)
     env_auto = os.getenv("PROMPT_BETTER_AUTO_MODE")

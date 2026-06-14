@@ -108,14 +108,20 @@ The optimization output is written to:
 
 The `validate` subcommand evaluates the **status quo** of your prompt's baseline instructions against a target dataset. It does not perform instruction rewriting or few-shot compilation. Instead, it measures how well the target Student model conforms to structure and accuracy guidelines under the current prompt instructions.
 
+Running `validate` only requires the student model endpoint to be online. If the teacher model is configured and online, it is used to grade semantic quality and calculate an overall aggregate score. If the teacher model is offline or unconfigured, validation proceeds gracefully by ignoring the teacher grading and scoring based only on structural and similarity evaluations.
+
 > [!TIP]
 > For a deeper conceptual foundation on evaluating AI systems, we recommend referring to the book **"AI Engineering - Building Application with Foundation Models"** by **Chip Huyen** (O'Reilly), specifically **Chapter 4. Evaluate AI Systems**.
 
 ### Mathematical Scoring Formulas
 
-For each evaluation case, the candidate output is rated between `0.0` and `1.0` using weighted scores. Since a Teacher Model is required, the validator fetches a semantic grade from the teacher and averages it with structural and similarity scores:
+For each evaluation case, the candidate output is rated between `0.0` and `1.0` using weighted scores. 
 
+If the Teacher Model is configured and online:
 $$\text{Aggregate Score} = \frac{(0.55 \times S_{\text{structural}} + 0.45 \times S_{\text{similarity}}) + S_{\text{teacher}}}{2}$$
+
+If the Teacher Model is unconfigured or offline during validation:
+$$\text{Aggregate Score} = 0.55 \times S_{\text{structural}} + 0.45 \times S_{\text{similarity}}$$
 
 ### Scoring Metrics & Code References
 
@@ -126,7 +132,7 @@ The scores are resolved in code inside [evaluator.py](prompt_better/dspy_manager
     *   Fields map precisely to target JSON schema types.
     *   Array counts match specified boundaries (e.g. `min_count`, `max_count`).
 3.  **Similarity Score ($S_{\text{similarity}}$)**: Calculated in `similarity_score`. It measures token-level F1 overlap (precision and recall of matching tokens) between the generated values and the golden-truth references.
-4.  **Teacher Score ($S_{\text{teacher}}$)**: Resolved via `teacher_score`. The Teacher model receives a structured grading schema containing the prompt instructions, inputs, candidate output, reference output, and quality rubric. It responds with a numeric score (`0.0` to `1.0`) and a text justification.
+4.  **Teacher Score ($S_{\text{teacher}}$)**: Resolved via `teacher_score`. If configured and online, the Teacher model receives a structured grading schema containing the prompt instructions, inputs, candidate output, reference output, and quality rubric. It responds with a numeric score (`0.0` to `1.0`) and a text justification. If unconfigured or offline, it is ignored (returns `None`).
 
 ### Custom Evaluator Implementations
 
@@ -171,10 +177,13 @@ flowchart TD
     ParseOutput --> CalcStruct["Calculate Structural Score (55% weight)"]
     ParseOutput --> CalcSim["Calculate Token F1 Similarity (45% weight)"]
     
-    CalcStruct --> CallTeacher["Invoke Teacher Model to grade output against rubric"]
-    CalcSim --> CallTeacher
-    CallTeacher --> CalcTeacher["Average (Base Scores + Teacher Score)"]
+    CalcStruct --> CheckTeacher{"Teacher configured & online?"}
+    CalcSim --> CheckTeacher
+    CheckTeacher -- Yes --> CallTeacher["Invoke Teacher Model to grade output against rubric"]
+    CallTeacher --> CalcTeacher["Average (Base Scores + Teacher Score) / 2"]
+    CheckTeacher -- No --> UseBase["Aggregate Score = Base Scores"]
     CalcTeacher --> SaveResult["Save ValidationResult metrics"]
+    UseBase --> SaveResult
     
     SaveResult --> CheckMore{More cases?}
     CheckMore -- Yes --> Iterate
