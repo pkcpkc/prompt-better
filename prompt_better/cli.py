@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from prompt_better.prompt_json import list_prompts, preview_schema, generate_from_json
-from prompt_better.dspy_manager import EndpointConfig, OptimizationConfig, validate_prompt, optimize_prompt
+from prompt_better.dspy_manager import EndpointConfig, OptimizationConfig, evaluate_prompt, optimize_prompt
 from prompt_better.config import build_runtime_config
 
 
@@ -31,8 +31,8 @@ def main() -> None:
         _add_common_file_args(schema_parser)
         schema_parser.add_argument("--prompt", required=True, help="Prompt name or ALL.")
 
-        validate_parser = subparsers.add_parser("validate", help="Run baseline JSON-schema validation against the student endpoint.")
-        _add_runtime_args(validate_parser)
+        evaluate_parser = subparsers.add_parser("evaluate", help="Run baseline evaluation/scoring against the student endpoint.")
+        _add_runtime_args(evaluate_parser)
 
         optimize_parser = subparsers.add_parser("optimize", help="Optimize one or more prompts with DSPy and write reports.")
         _add_runtime_args(optimize_parser)
@@ -60,8 +60,8 @@ def main() -> None:
         golden_parser.add_argument("--teacher-api-key", default=None, help="API key for the teacher endpoint.")
         golden_parser.add_argument("--teacher-temperature", type=float, default=None, help="MIPRO temperature for the teacher endpoint (default: 0.2).")
 
-        validate_spec_parser = subparsers.add_parser("validate-spec", help="Validate prompt.json files recursively against prompt-schema.json.")
-        _add_common_file_args(validate_spec_parser)
+        evaluate_spec_parser = subparsers.add_parser("evaluate-spec", help="Validate prompt.json files recursively against prompt-schema.json.")
+        _add_common_file_args(evaluate_spec_parser)
 
         args = parser.parse_args()
 
@@ -128,8 +128,8 @@ def main() -> None:
             )
             return
 
-        if args.command == "validate-spec":
-            _validate_prompt_specifications(Path(args.prompts_dir))
+        if args.command == "evaluate-spec":
+            _evaluate_prompt_specifications(Path(args.prompts_dir))
             return
 
         prompts_dir = Path(args.prompts_dir)
@@ -153,8 +153,8 @@ def main() -> None:
             return
 
         config = build_runtime_config(args)
-        if args.command == "validate":
-            result = validate_prompt(config)
+        if args.command == "evaluate":
+            result = evaluate_prompt(config)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             from prompt_better.dspy_manager.reporter import print_report_summary
             for prompt_name, prompt_report in result.items():
@@ -167,8 +167,8 @@ def main() -> None:
                 print_report_summary(
                     prompt_name=prompt_name,
                     is_optimize=True,
-                    baseline_report=prompt_result["baseline_validation"],
-                    optimized_report=prompt_result["teacher_validation"],
+                    baseline_report=prompt_result["baseline_evaluation"],
+                    optimized_report=prompt_result["teacher_evaluation"],
                     train_size=prompt_result["train_size"],
                     evalset_ids=set(prompt_result.get("evalset_ids", [])),
                 )
@@ -235,7 +235,7 @@ def _add_runtime_args(parser: argparse.ArgumentParser) -> None:
         "--teacher-eval-temperature",
         type=float,
         default=None,
-        help="Validation temperature for the teacher endpoint (default: 0.0). Env: PROMPT_BETTER_TEACHER_EVAL_TEMPERATURE"
+        help="Evaluation temperature for the teacher endpoint (default: 0.0). Env: PROMPT_BETTER_TEACHER_EVAL_TEMPERATURE"
     )
     
     # Advanced optimization settings
@@ -320,7 +320,7 @@ def _required_env(name: str) -> str:
     return value
 
 
-def _validate_prompt_specifications(prompts_dir: Path) -> None:
+def _evaluate_prompt_specifications(prompts_dir: Path) -> None:
     schema_path = Path(__file__).parent / "prompt_json" / "prompt-schema.json"
     if not schema_path.exists():
         raise FileNotFoundError(f"Schema file not found at {schema_path}")
@@ -359,8 +359,8 @@ def _validate_prompt_specifications(prompts_dir: Path) -> None:
             all_valid = False
             
     if not all_valid:
-        raise SystemExit("Prompt schema validation failed.")
-    print("All prompt specifications validated successfully.")
+        raise SystemExit("Prompt schema evaluation failed.")
+    print("All prompt specifications evaluated successfully.")
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ class OptimizationConfig(BaseModel):
 
 
 
-class ValidationResult(BaseModel):
+class EvaluationResult(BaseModel):
     example_id: str
     prompt_name: str
     mode: str

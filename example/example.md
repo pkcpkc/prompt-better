@@ -11,7 +11,7 @@ The framework bridges Python-based prompt optimization (built on DSPy) with Appl
 The most convenient way to run the entire flow is using the pre-configured automation script `example/example.sh`. This script will:
 1. Verify if the local macOS Vapor bridge is running (and automatically build and launch it in the background if it is not).
 2. Load credentials securely from the macOS Keychain.
-3. Run Step 1: Baseline validation (`validate` command).
+3. Run Step 1: Baseline evaluation (`evaluate` command).
 4. Run Step 2: DSPy optimization (`optimize` command).
 5. Run Step 3: Export the optimized prompt to Swift (`generate` command).
 6. Automatically stop the macOS bridge after completing execution.
@@ -114,10 +114,10 @@ The script will query the keychain securely at runtime using macOS `security` to
 
 ## 5. Execution & Optimization Workflow
 
-### Run Baseline Validation
+### Run Baseline Evaluation
 Measure the performance of your baseline instructions before optimization:
 ```bash
-python3 -m prompt_better.cli validate \
+python3 -m prompt_better.cli evaluate \
   --prompts-dir example/prompts \
   --prompt TopicClassifierPrompt
 ```

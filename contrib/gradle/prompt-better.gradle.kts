@@ -176,9 +176,9 @@ tasks.register<Exec>("promptBetterPreviewSchema") {
     }
 }
 
-tasks.register<Exec>("promptBetterValidate") {
-    description = "Runs baseline prompt validation against the configured student endpoint using JSON schema."
-    configurePromptBetterRuntime(command = "validate", includeRuntimeEndpoints = true)
+tasks.register<Exec>("promptBetterEvaluate") {
+    description = "Runs baseline prompt evaluation against the configured student endpoint using JSON schema."
+    configurePromptBetterRuntime(command = "evaluate", includeRuntimeEndpoints = true)
 }
 
 tasks.register<Exec>("promptBetterOptimize") {

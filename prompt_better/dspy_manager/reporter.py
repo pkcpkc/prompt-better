@@ -28,11 +28,11 @@ def print_report_summary(
             "teacher_score": optimized_report.get("average_teacher_score", 0.0),
         }
 
-    # Build maps of example_id -> validation dict
-    base_vals = {v["example_id"]: v for v in baseline_report.get("validations", [])}
+    # Build maps of example_id -> evaluation dict
+    base_vals = {v["example_id"]: v for v in (baseline_report.get("evaluations") or baseline_report.get("validations") or [])}
     opt_vals = {}
     if optimized_report:
-        opt_vals = {v["example_id"]: v for v in optimized_report.get("validations", optimized_report.get("results", []))}
+        opt_vals = {v["example_id"]: v for v in (optimized_report.get("evaluations") or optimized_report.get("validations") or optimized_report.get("results") or [])}
 
     # All examples evaluated
     eval_ids = list(base_vals.keys())

@@ -14,7 +14,7 @@
   "num_threads": 4,
   "num_threads_desc": "Number of parallel threads to use during metric evaluations (keep low for local models, high for cloud APIs).",
   "train_ratio": 0.8,
-  "train_ratio_desc": "Split ratio of the dataset examples allocated for training, with the remainder used for validation.",
+  "train_ratio_desc": "Split ratio of the dataset examples allocated for training, with the remainder used for evaluation.",
   "requires_permission_to_run": true,
   "requires_permission_to_run_desc": "Ask for user confirmation of estimated API token costs before executing compilation loops.",
   "optimizer": "predict",

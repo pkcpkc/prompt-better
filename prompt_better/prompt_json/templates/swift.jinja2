@@ -23,6 +23,23 @@ struct {{ spec.name }}: GenerableWithPrompt {
 {{ spec.instructions.prompt }}
 """
 
+    public static func buildSystemPrompt(for input: String = "", context: [String: String] = [:]) -> String {
+        var result = systemPrompt
+        var values = context
+        {% if spec.instructions.context %}
+        let primaryInputKey = "{{ spec.instructions.context[0].name }}"
+        if !input.isEmpty {
+            values[primaryInputKey] = input
+        }
+        {% endif %}
+        {% for field in spec.instructions.context | sort(attribute='name') %}
+        if let val = values["{{ field.name }}"] {
+            result += "\n\n{{ field.name | swift_title_case }}:\n\(val)"
+        }
+        {% endfor %}
+        return result
+    }
+
     static var options: GenerationOptions? = {
         var options = GenerationOptions()
 {% if spec.config.temperature > 0.0 %}

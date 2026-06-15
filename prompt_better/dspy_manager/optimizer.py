@@ -19,7 +19,7 @@ from prompt_better.dataset_manager import (
     flatten_history,
     token_f1,
 )
-from .models import EndpointConfig, OptimizationConfig, ValidationResult
+from .models import EndpointConfig, OptimizationConfig, EvaluationResult
 from .openai_structured import StructuredOutputError, call_json_schema
 from .evaluator import load_evaluator
 from .optimizers import load_optimizer
@@ -29,7 +29,7 @@ class PromptOptimizationError(RuntimeError):
     """Raised when prompt optimization cannot continue."""
 
 
-def validate_prompt(config: OptimizationConfig) -> Dict[str, Any]:
+def evaluate_prompt(config: OptimizationConfig) -> Dict[str, Any]:
     specs = load_prompt_specs(config.prompts_dir)
     examples = load_examples(config.dataset_file)
     prompt_names = _resolve_prompt_names(config.prompt_name, specs)
@@ -38,8 +38,8 @@ def validate_prompt(config: OptimizationConfig) -> Dict[str, Any]:
         spec = specs[prompt_name]
         evaluator = load_evaluator(config.evaluator)
         prompt_examples = examples_for_prompt(examples, prompt_name)
-        validations = [
-            _validate_single_example(spec, example, specs, config, evaluator)
+        evaluations = [
+            _evaluate_single_example(spec, example, specs, config, evaluator)
             for example in prompt_examples
         ]
         
@@ -53,15 +53,15 @@ def validate_prompt(config: OptimizationConfig) -> Dict[str, Any]:
 
         prompt_report = {
             "prompt_name": prompt_name,
-            "count": len(validations),
-            "average_structural_score": _average(validation.structural_score for validation in validations),
-            "average_similarity_score": _average(validation.similarity_score for validation in validations),
-            "average_aggregate_score": _average(validation.aggregate_score for validation in validations),
-            "average_teacher_score": _average(validation.teacher_score for validation in validations),
-            "validations": [validation.model_dump() for validation in validations],
+            "count": len(evaluations),
+            "average_structural_score": _average(evaluation.structural_score for evaluation in evaluations),
+            "average_similarity_score": _average(evaluation.similarity_score for evaluation in evaluations),
+            "average_aggregate_score": _average(evaluation.aggregate_score for evaluation in evaluations),
+            "average_teacher_score": _average(evaluation.teacher_score for evaluation in evaluations),
+            "evaluations": [evaluation.model_dump() for evaluation in evaluations],
         }
         report_file.write_text(json.dumps(prompt_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        print(f"  Validation report written → {report_file}")
+        print(f"  Evaluation report written → {report_file}")
 
         report[prompt_name] = prompt_report
 
@@ -150,9 +150,9 @@ def optimize_prompt(config: OptimizationConfig) -> Dict[str, Any]:
         else:
             trainset, evalset = split_examples(prompt_examples, config.train_ratio)
 
-        # Get baseline validation metrics for the evaluation target examples
+        # Get baseline evaluation metrics for the evaluation target examples
         eval_target = evalset if config.eval_cases_only else prompt_examples
-        baseline_validation = _get_baseline_eval_results(
+        baseline_evaluation = _get_baseline_eval_results(
             config=config,
             spec=spec,
             evalset=eval_target,
@@ -189,7 +189,7 @@ def optimize_prompt(config: OptimizationConfig) -> Dict[str, Any]:
         optimized_score = _score_module_on_examples(compiled, evalset, specs, metric)
 
 
-        teacher_validation = _score_with_teacher_on_eval(
+        teacher_evaluation = _score_with_teacher_on_eval(
             compiled=compiled,
             evalset=eval_target,
             spec=spec,
@@ -229,8 +229,8 @@ def optimize_prompt(config: OptimizationConfig) -> Dict[str, Any]:
             "evalset_ids": [example.example_id for example in evalset],
             "baseline_dspy_score": baseline_score,
             "optimized_dspy_score": optimized_score,
-            "baseline_validation": baseline_validation,
-            "teacher_validation": teacher_validation,
+            "baseline_evaluation": baseline_evaluation,
+            "teacher_evaluation": teacher_evaluation,
             "json_schema": spec.to_json_schema(),
             "extracted_instruction": extracted_instruction,
             "serialized_artifact": str(serialized_path) if serialized_path else None,
@@ -257,62 +257,64 @@ def _get_baseline_eval_results(
     baseline_report_file = prompt_output_dir / "baseline-report.json"
     
     # 1. Try to load existing baseline-report.json
-    existing_validations: Dict[str, Any] = {}
+    existing_evaluations: Dict[str, Any] = {}
     if baseline_report_file.exists():
         try:
             data = json.loads(baseline_report_file.read_text(encoding="utf-8"))
-            if isinstance(data, dict) and "validations" in data:
-                for v in data["validations"]:
+            if isinstance(data, dict):
+                # Handle backwards compatibility for loading old baseline-reports with 'validations' key
+                evals = data.get("evaluations") or data.get("validations") or []
+                for v in evals:
                     if isinstance(v, dict) and "example_id" in v:
-                        existing_validations[v["example_id"]] = v
+                        existing_evaluations[v["example_id"]] = v
         except Exception as e:
             print(f"Warning: Could not parse baseline-report.json: {e}", file=sys.stderr)
 
-    # 2. Check which evalset examples are missing or need baseline validation
+    # 2. Check which evalset examples are missing or need baseline evaluation
     baseline_list: List[Dict[str, Any]] = []
     missing_examples = []
     
     for example in evalset:
         eid = example.example_id
-        if eid in existing_validations:
-            baseline_list.append(existing_validations[eid])
+        if eid in existing_evaluations:
+            baseline_list.append(existing_evaluations[eid])
         else:
             missing_examples.append(example)
 
-    # 3. Dynamically run baseline validation for missing examples
+    # 3. Dynamically run baseline evaluation for missing examples
     if missing_examples:
-        print(f"Running baseline validation on-the-fly for {len(missing_examples)} missing cases...")
+        print(f"Running baseline evaluation on-the-fly for {len(missing_examples)} missing cases...")
         for example in missing_examples:
-            val_res = _validate_single_example(spec, example, specs, config, evaluator)
-            baseline_list.append(val_res.model_dump())
-            # Add to existing_validations so we can write/cache it
-            existing_validations[example.example_id] = val_res.model_dump()
+            eval_res = _evaluate_single_example(spec, example, specs, config, evaluator)
+            baseline_list.append(eval_res.model_dump())
+            # Add to existing_evaluations so we can write/cache it
+            existing_evaluations[example.example_id] = eval_res.model_dump()
 
     # 4. Write back the updated/merged baseline-report.json
-    # We construct a full report containing all validations we've run so far
-    merged_validations = list(existing_validations.values())
+    # We construct a full report containing all evaluations we've run so far
+    merged_evaluations = list(existing_evaluations.values())
     prompt_report = {
         "prompt_name": spec.name,
-        "count": len(merged_validations),
-        "average_structural_score": _average(v.get("structural_score") for v in merged_validations),
-        "average_similarity_score": _average(v.get("similarity_score") for v in merged_validations),
-        "average_aggregate_score": _average(v.get("aggregate_score") for v in merged_validations),
-        "average_teacher_score": _average(v.get("teacher_score") for v in merged_validations),
-        "validations": merged_validations,
+        "count": len(merged_evaluations),
+        "average_structural_score": _average(v.get("structural_score") for v in merged_evaluations),
+        "average_similarity_score": _average(v.get("similarity_score") for v in merged_evaluations),
+        "average_aggregate_score": _average(v.get("aggregate_score") for v in merged_evaluations),
+        "average_teacher_score": _average(v.get("teacher_score") for v in merged_evaluations),
+        "evaluations": merged_evaluations,
     }
     baseline_report_file.write_text(json.dumps(prompt_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"  Baseline report updated/written → {baseline_report_file}")
 
-    # 5. Extract only the validations corresponding to evalset to return
+    # 5. Extract only the evaluations corresponding to evalset to return
     evalset_ids = {example.example_id for example in evalset}
-    evalset_validations = [v for v in merged_validations if v["example_id"] in evalset_ids]
+    evalset_evaluations = [v for v in merged_evaluations if v["example_id"] in evalset_ids]
     
     return {
-        "average_structural_score": _average(v.get("structural_score") for v in evalset_validations),
-        "average_similarity_score": _average(v.get("similarity_score") for v in evalset_validations),
-        "average_aggregate_score": _average(v.get("aggregate_score") for v in evalset_validations),
-        "average_teacher_score": _average(v.get("teacher_score") for v in evalset_validations),
-        "validations": evalset_validations,
+        "average_structural_score": _average(v.get("structural_score") for v in evalset_evaluations),
+        "average_similarity_score": _average(v.get("similarity_score") for v in evalset_evaluations),
+        "average_aggregate_score": _average(v.get("aggregate_score") for v in evalset_evaluations),
+        "average_teacher_score": _average(v.get("teacher_score") for v in evalset_evaluations),
+        "evaluations": evalset_evaluations,
     }
 
 
@@ -426,13 +428,13 @@ def _score_module_on_examples(module, examples: Iterable[Any], specs: Dict[str, 
     return _average(scores)
 
 
-def _validate_single_example(
+def _evaluate_single_example(
     spec: Any,
     example: Any,
     specs: Dict[str, Any],
     config: OptimizationConfig,
     evaluator,
-) -> ValidationResult:
+) -> EvaluationResult:
     messages = resolve_history_messages(example, specs)
     messages.append({
         "role": "user",
@@ -446,7 +448,7 @@ def _validate_single_example(
     teacher_score, teacher_rationale = evaluator.teacher_score(spec, example, candidate, specs, config)
     aggregate = evaluator.aggregate_score(spec, structural, similarity, teacher_score)
 
-    return ValidationResult(
+    return EvaluationResult(
         example_id=example.example_id,
         prompt_name=spec.name,
         mode="manual_json_schema",
@@ -467,7 +469,7 @@ def _score_with_teacher_on_eval(
     config: OptimizationConfig,
     evaluator,
 ) -> Dict[str, Any]:
-    results: List[ValidationResult] = []
+    results: List[EvaluationResult] = []
     for example in evalset:
         inputs = dict(example.inputs)
         if example.history:
@@ -482,7 +484,7 @@ def _score_with_teacher_on_eval(
         aggregate = evaluator.aggregate_score(spec, structural, similarity, teacher_score)
         
         results.append(
-            ValidationResult(
+            EvaluationResult(
                 example_id=example.example_id,
                 prompt_name=spec.name,
                 mode="optimized_dspy",

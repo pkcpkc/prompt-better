@@ -12,7 +12,7 @@ from prompt_better.dspy_manager.models import OptimizationConfig, EndpointConfig
 
 
 class ReportingTests(unittest.TestCase):
-    def test_print_report_summary_validate(self) -> None:
+    def test_print_report_summary_evaluate(self) -> None:
         baseline_report = {
             "prompt_name": "TestPrompt",
             "count": 2,
@@ -20,7 +20,7 @@ class ReportingTests(unittest.TestCase):
             "average_similarity_score": 0.8,
             "average_aggregate_score": 0.9,
             "average_teacher_score": 0.95,
-            "validations": [
+            "evaluations": [
                 {
                     "example_id": "case1",
                     "structural_score": 1.0,
@@ -49,7 +49,7 @@ class ReportingTests(unittest.TestCase):
             )
         output = f.getvalue()
 
-        self.assertIn("Validation result: TestPrompt", output)
+        self.assertIn("Evaluation result: TestPrompt", output)
         self.assertIn("Examples count        : 2", output)
         self.assertIn("Average optimization:", output)
         self.assertIn("|                 |   aggregate score   |   structural score   |   similarity score   |   teacher score   |", output)
@@ -66,7 +66,7 @@ class ReportingTests(unittest.TestCase):
             "average_similarity_score": 0.4,
             "average_aggregate_score": 0.45,
             "average_teacher_score": 0.6,
-            "validations": [
+            "evaluations": [
                 {
                     "example_id": "case1",
                     "structural_score": 0.5,

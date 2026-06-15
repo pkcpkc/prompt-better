@@ -18,3 +18,11 @@ def swift_type_filter(field: PromptFieldSpec) -> str:
     if field.is_array:
         return f"[{to_swift_primitive(field.items or 'string')}]"
     return to_swift_primitive(field.type)
+
+
+def swift_title_case_filter(name: str) -> str:
+    import re
+    words = re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\b)|[0-9]+', name)
+    if not words:
+        return name.capitalize()
+    return " ".join(word.capitalize() for word in words)

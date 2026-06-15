@@ -2,7 +2,7 @@
 {%- if is_optimize %}
 │  Optimization result: {{ prompt_name }}
 {%- else %}
-│  Validation result: {{ prompt_name }}
+│  Evaluation result: {{ prompt_name }}
 {%- endif %}
 └─────────────────────────────────────────────────────────────────┘
 {%- if is_optimize %}
@@ -24,7 +24,7 @@ Average optimization:
 Per dataset optimization:
 {%- else %}
 
-Per dataset validation:
+Per dataset evaluation:
 {%- endif %}
 | {{ "" | align_left(15) }} | {{ "aggregate score" | align_center(19) }} | {{ "structural score" | align_center(20) }} | {{ "similarity score" | align_center(20) }} | {{ "teacher score" | align_center(17) }} |
 | :-------------- | :-----------------: | :------------------: | :------------------: | :---------------: |

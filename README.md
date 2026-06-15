@@ -12,7 +12,7 @@
 
 ## 1. What This Is About
 
-`prompt-better` is a generic, reusable, and platform-agnostic framework designed to validate, execute, and optimize Large Language Model (LLM) prompts. Instead of hardcoding prompts inside application source files, prompts are defined in a language-agnostic data asset (`prompt.json`), establishing a **Single Source of Truth (SSOT)**.
+`prompt-better` is a generic, reusable, and platform-agnostic framework designed to evaluate, execute, and optimize Large Language Model (LLM) prompts. Instead of hardcoding prompts inside application source files, prompts are defined in a language-agnostic data asset (`prompt.json`), establishing a **Single Source of Truth (SSOT)**.
 
 ### Built on Top of DSPy & Pydantic
 
@@ -120,11 +120,11 @@ The optimization output is written to:
 
 ---
 
-## 3. Subcommand `validate`
+## 3. Subcommand `evaluate`
 
-The `validate` subcommand evaluates the **status quo** of your prompt's baseline instructions against a target dataset. It does not perform instruction rewriting or few-shot compilation. Instead, it measures how well the target Student model conforms to structure and accuracy guidelines under the current prompt instructions.
+The `evaluate` subcommand evaluates the **status quo** of your prompt's baseline instructions against a target dataset. It does not perform instruction rewriting or few-shot compilation. Instead, it measures how well the target Student model conforms to structure and accuracy guidelines under the current prompt instructions.
 
-Running `validate` only requires the student model endpoint to be online. If the teacher model is configured and online, it is used to grade semantic quality and calculate an overall aggregate score. If the teacher model is offline or unconfigured, validation proceeds gracefully by ignoring the teacher grading and scoring based only on structural and similarity evaluations.
+Running `evaluate` only requires the student model endpoint to be online. If the teacher model is configured and online, it is used to grade semantic quality and calculate an overall aggregate score. If the teacher model is offline or unconfigured, evaluation proceeds gracefully by ignoring the teacher grading and scoring based only on structural and similarity evaluations.
 
 > [!TIP]
 > For a deeper conceptual foundation on evaluating AI systems, we recommend referring to the book **"AI Engineering - Building Application with Foundation Models"** by **Chip Huyen** (O'Reilly), specifically **Chapter 4. Evaluate AI Systems**.
@@ -136,14 +136,14 @@ For each evaluation case, the candidate output is rated between `0.0` and `1.0` 
 If the Teacher Model is configured and online:
 $$\text{Aggregate Score} = \frac{(0.55 \times S_{\text{structural}} + 0.45 \times S_{\text{similarity}}) + S_{\text{teacher}}}{2}$$
 
-If the Teacher Model is unconfigured or offline during validation:
+If the Teacher Model is unconfigured or offline during evaluation:
 $$\text{Aggregate Score} = 0.55 \times S_{\text{structural}} + 0.45 \times S_{\text{similarity}}$$
 
 ### Scoring Metrics & Code References
 
 The scores are resolved in code inside [evaluator.py](prompt_better/dspy_manager/evaluator.py) via a resolved `Evaluator` instance (by default, `DefaultEvaluator` inherits from `BaseEvaluator`):
 
-1.  **Validation Loop**: [validate_prompt](prompt_better/dspy_manager/optimizer.py) iterates through prompt files and gathers results using `_validate_single_example`.
+1.  **Evaluation Loop**: [evaluate_prompt](prompt_better/dspy_manager/optimizer.py) iterates through prompt files and gathers results using `_evaluate_single_example`.
 2.  **Structural Score ($S_{\text{structural}}$)**: Calculated in `structural_score`. It verifies:
     - Fields map precisely to target JSON schema types.
     - Array counts match specified boundaries (e.g. `min_count`, `max_count`).
@@ -180,11 +180,11 @@ You can configure the custom evaluator dynamically in three ways (resolved hiera
    }
    ```
 
-### Validation Flow Diagram
+### Evaluation Flow Diagram
 
 ```mermaid
 flowchart TD
-    Start["Start cli validate"] --> Scan["Scan --prompts-dir for prompt.json"]
+    Start["Start cli evaluate"] --> Scan["Scan --prompts-dir for prompt.json"]
     Scan --> LoadDataset["Load dataset/ and golden-truth/ case cases"]
     LoadDataset --> Iterate["For each test case..."]
     Iterate --> BuildPayload["Compile prompt instructions + case inputs"]
@@ -198,13 +198,13 @@ flowchart TD
     CheckTeacher -- Yes --> CallTeacher["Invoke Teacher Model to grade output against rubric"]
     CallTeacher --> CalcTeacher["Average (Base Scores + Teacher Score) / 2"]
     CheckTeacher -- No --> UseBase["Aggregate Score = Base Scores"]
-    CalcTeacher --> SaveResult["Save ValidationResult metrics"]
+    CalcTeacher --> SaveResult["Save EvaluationResult metrics"]
     UseBase --> SaveResult
 
     SaveResult --> CheckMore{More cases?}
     CheckMore -- Yes --> Iterate
     CheckMore -- No --> GenerateReport["Output JSON report & print summary stats"]
-    GenerateReport --> End["End validate"]
+    GenerateReport --> End["End evaluate"]
 ```
 
 ---
@@ -552,8 +552,8 @@ Defines expected ground truth values and human-written grading rubrics.
 | :---------------------- | :-------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list-prompts`          | Scans for prompt specifications inside the target directory.          | `--prompts-dir`                                                                                                                                              |
 | `preview-schema`        | Emits the parsed Pydantic schema structure derived from the spec.     | `--prompts-dir`, `--prompt`                                                                                                                                  |
-| `validate-spec`         | Runs validator checks on prompt JSONs against `prompt-schema.json`.   | `--prompts-dir`                                                                                                                                              |
-| `validate`              | Runs evaluation cases against the Student model.                      | `--prompts-dir`, `--prompt`, `--dataset`, `--student-temperature`, `--teacher-eval-temperature`                                                              |
+| `evaluate-spec`         | Runs validator checks on prompt JSONs against `prompt-schema.json`.   | `--prompts-dir`                                                                                                                                              |
+| `evaluate`              | Runs evaluation cases against the Student model.                      | `--prompts-dir`, `--prompt`, `--dataset`, `--student-temperature`, `--teacher-eval-temperature`                                                              |
 | `optimize`              | Compiles and optimizes instructions via DSPy MIPROv2.                 | `--prompts-dir`, `--prompt`, `--dataset`, `--student-temperature`, `--teacher-temperature`, `--teacher-eval-temperature`, `--eval-cases-only`, `--optimizer` |
 | `generate-golden-truth` | Generates placeholder schemas inside the target `golden-truth/` path. | `--prompts-dir`, `--dataset-dir`, `--prompt`, `--case-id`, `--teacher-temperature`                                                                           |
 | `generate`              | Compiles Swift class structs conformant to `AIPromptCore`.            | `--source`, `--target`, `--language swift`                                                                                                                   |
@@ -568,7 +568,7 @@ Defines expected ground truth values and human-written grading rubrics.
 - `PROMPT_BETTER_TEACHER_MODEL`: Teacher model ID (e.g. `gpt-4o`).
 - `PROMPT_BETTER_TEACHER_API_KEY`: API token authorization key.
 - `PROMPT_BETTER_TEACHER_TEMPERATURE`: General/MIPRO temperature for the teacher model when proposing prompt variations and creating samples (defaults to `0.2`).
-- `PROMPT_BETTER_TEACHER_EVAL_TEMPERATURE`: Validation/eval temperature for the teacher model when grading/evaluating candidate outputs (defaults to `0.0` as recommended).
+- `PROMPT_BETTER_TEACHER_EVAL_TEMPERATURE`: Evaluation/eval temperature for the teacher model when grading/evaluating candidate outputs (defaults to `0.0` as recommended).
 - `PROMPT_BETTER_OPTIMIZER`: Import path or file path to custom Optimizer class, or built-in modes: `"chain-of-thought"` (default) or `"predict"`.
 
 ### Scenario-Specific CLI Presets
@@ -603,7 +603,7 @@ python3 -m prompt_better.cli optimize \
 For developers using Gradle (e.g., Android, iOS, or Kotlin Multiplatform projects), a generic, reusable Gradle script plugin helper is available in [contrib/gradle/](contrib/gradle/):
 
 - Refer to the [contrib/gradle/README.md](contrib/gradle/README.md) for setup and integration instructions.
-- Once integrated, tasks like `promptBetterList`, `promptBetterValidate`, `promptBetterOptimize`, and `promptBetterGenerateSwift` will be available in your project's Gradle build pipeline.
+- Once integrated, tasks like `promptBetterList`, `promptBetterEvaluate`, `promptBetterOptimize`, and `promptBetterGenerateSwift` will be available in your project's Gradle build pipeline.
 
 ### iOS Integration Setup (`AIPromptCore`)
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shell script to validate, optimize, and convert the optimized JSON prompt specification to Swift.
+# Shell script to evaluate, optimize, and convert the optimized JSON prompt specification to Swift.
 set -e
 
 
@@ -91,7 +91,7 @@ if [ -z "${PROMPT_BETTER_TEACHER_API_KEY:-}" ]; then
         echo "Loaded PROMPT_BETTER_TEACHER_API_KEY from macOS Keychain."
     else
         echo "Warning: PROMPT_BETTER_TEACHER_API_KEY not found in environment or macOS Keychain."
-        echo "Step 1 (baseline validation) will still run (needs student model only)."
+        echo "Step 1 (baseline evaluation) will still run (needs student model only)."
         echo "Step 2 & 3 (optimization & conversion) will be skipped."
     fi
 fi
@@ -131,8 +131,8 @@ if [[ "$PROMPT_BETTER_STUDENT_BASE_URL" == *"localhost"* || "$PROMPT_BETTER_STUD
     echo ""
 fi
 
-echo "Step 1: Running baseline validation for TopicClassifierPrompt..."
-"${PYTHON_CMD[@]}" -m prompt_better.cli validate \
+echo "Step 1: Running baseline evaluation for TopicClassifierPrompt..."
+"${PYTHON_CMD[@]}" -m prompt_better.cli evaluate \
   --prompts-dir example/prompts \
   --prompt TopicClassifierPrompt \
   --no-requires-permission-to-run

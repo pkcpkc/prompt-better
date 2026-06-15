@@ -37,17 +37,17 @@ Once applied, the script registers the following tasks under the `prompt-better`
 
 *   **`promptBetterList`**: Lists all prompts defined in your prompt directory.
 *   **`promptBetterPreviewSchema`**: Prints the JSON schema format for the selected prompt.
-*   **`promptBetterValidate`**: Runs baseline prompt validation against the configured Student endpoint.
+*   **`promptBetterEvaluate`**: Runs baseline prompt evaluation against the configured Student endpoint.
 *   **`promptBetterOptimize`**: Compiles and optimizes instructions using your Student and Teacher LLM setup.
 *   **`promptBetterGenerateSwift`**: Scans the prompts directory for `prompt.json` files and generates Swift `@Generable` structs.
-
+ 
 ## CLI Properties Override
-
+ 
 You can override configuration values dynamically on the command-line using `-P` flags. These CLI arguments take precedence over extension configurations:
-
+ 
 ```bash
-# Validate a specific prompt
-./gradlew promptBetterValidate -PpromptBetterPrompt=TopicClassifierPrompt
+# Evaluate a specific prompt
+./gradlew promptBetterEvaluate -PpromptBetterPrompt=TopicClassifierPrompt
 
 # Run optimization on a specific prompt and apply the optimized instructions
 ./gradlew promptBetterOptimize -PpromptBetterPrompt=TopicClassifierPrompt -PpromptBetterApply=true

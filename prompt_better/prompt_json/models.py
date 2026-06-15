@@ -106,12 +106,24 @@ class PromptSpec(BaseModel):
             res.append(f)
         return res
 
+    def _to_title_case(self, name: str) -> str:
+        import re
+        # Convert camelCase, snake_case, etc. to Title Case
+        words = re.findall(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\b)|[0-9]+', name)
+        if not words:
+            return name.capitalize()
+        return " ".join(word.capitalize() for word in words)
+
     def build_instructions(self, values: Dict[str, str], template_override: Optional[str] = None) -> str:
         rendered = template_override if template_override is not None else self.instructions.prompt
-        for placeholder in self.placeholders:
-            if placeholder not in values:
-                raise KeyError(f"Missing placeholder '{placeholder}' for prompt {self.name}")
-            rendered = rendered.replace(f"{{{{{placeholder}}}}}", values[placeholder])
+        
+        # Append-only section formatting (matching DSPy/Swift)
+        input_fields = [f.name for f in self.fields if f.role == "input"]
+        for field_name in sorted(input_fields):
+            if field_name not in values:
+                continue
+            formatted_name = self._to_title_case(field_name)
+            rendered += f"\n\n{formatted_name}:\n{values[field_name]}"
         return rendered
 
     def to_json_schema(self) -> Dict[str, Any]:

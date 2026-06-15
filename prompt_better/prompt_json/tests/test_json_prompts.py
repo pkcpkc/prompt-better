@@ -26,7 +26,7 @@ class JSONPromptTests(unittest.TestCase):
         article_insight_file.write_text(json.dumps({
             "name": "ArticleInsightPrompt",
             "instructions": {
-                "prompt": "Summarize this article:\n\nArticle: {{input}}",
+                "prompt": "Summarize this article:",
                 "context": [
                     {
                         "name": "input",
@@ -59,7 +59,7 @@ class JSONPromptTests(unittest.TestCase):
         search_summary_file.write_text(json.dumps({
             "name": "SearchSummaryPrompt",
             "instructions": {
-                "prompt": "Synthesize search results:\n\nQuery: {{query}}\nContext: {{articleContext}}",
+                "prompt": "Synthesize search results:",
                 "context": [
                     {
                         "name": "query",
@@ -89,7 +89,7 @@ class JSONPromptTests(unittest.TestCase):
         research_result_file.write_text(json.dumps({
             "name": "ResearchResultPrompt",
             "instructions": {
-                "prompt": "Extract findings from this text:\n\nText: {{input}}",
+                "prompt": "Extract findings from this text:",
                 "context": [
                     {
                         "name": "input",
@@ -115,7 +115,7 @@ class JSONPromptTests(unittest.TestCase):
     def test_extracts_article_insight(self) -> None:
         self.assertIn("ArticleInsightPrompt", self.specs)
         spec = self.specs["ArticleInsightPrompt"]
-        self.assertEqual(spec.placeholders, ["input"])
+        self.assertEqual(spec.placeholders, [])
         self.assertIn("input", [field.name for field in spec.fields])
         self.assertIn("summary", [field.name for field in spec.fields])
         self.assertIn("questions", [field.name for field in spec.fields])
@@ -130,7 +130,7 @@ class JSONPromptTests(unittest.TestCase):
     def test_search_summary_placeholders_include_query_and_context(self) -> None:
         self.assertIn("SearchSummaryPrompt", self.specs)
         spec = self.specs["SearchSummaryPrompt"]
-        self.assertEqual(sorted(spec.placeholders), ["articleContext", "query"])
+        self.assertEqual(spec.placeholders, [])
 
     def test_research_result_description_is_kept(self) -> None:
         self.assertIn("ResearchResultPrompt", self.specs)
@@ -190,6 +190,23 @@ class JSONPromptTests(unittest.TestCase):
             language = None
 
         self.assertEqual(_resolve_generation_template(Args()), Path("custom/template.jinja2"))
+
+    def test_build_instructions_append_only(self) -> None:
+        spec = self.specs["SearchSummaryPrompt"]
+        
+        values = {
+            "query": "Who is Angela Merkel?",
+            "articleContext": "Angela Merkel is a retired German politician."
+        }
+        rendered = spec.build_instructions(values)
+        
+        expected = (
+            "Synthesize search results:\n\n"
+            "Article Context:\nAngela Merkel is a retired German politician.\n\n"
+            "Query:\nWho is Angela Merkel?"
+        )
+        self.assertEqual(rendered, expected)
+
 
     def test_resolve_generation_template_reports_missing_language(self) -> None:
         class Args:
