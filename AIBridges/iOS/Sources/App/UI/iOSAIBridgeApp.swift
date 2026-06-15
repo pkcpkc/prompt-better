@@ -35,12 +35,36 @@ struct iOSAIBridgeApp: App {
   }
 }
 
+struct LogEntry: Identifiable, Equatable {
+  let id = UUID()
+  let text: String
+}
+
+@MainActor
+class LogsManager: ObservableObject {
+  @Published var logs: [LogEntry] = []
+
+  func log(_ message: String) {
+    let timestamp = DateFormatter.localizedString(
+      from: Date(), dateStyle: .none, timeStyle: .medium)
+    logs.append(LogEntry(text: "[\(timestamp)] \(message)"))
+    if logs.count > 100 {
+      logs.removeFirst()
+    }
+  }
+
+  func clear() {
+    logs.removeAll()
+  }
+}
+
 @MainActor
 class ServerManager: ObservableObject {
   @Published var isRunning = false
-  @Published var logs: [String] = []
   @Published var port: Int = 8080
   @Published var ipAddress: String = "localhost"
+  
+  let logsManager = LogsManager()
 
   private var app: Application?
 
@@ -82,12 +106,7 @@ class ServerManager: ObservableObject {
   }
 
   func log(_ message: String) {
-    let timestamp = DateFormatter.localizedString(
-      from: Date(), dateStyle: .none, timeStyle: .medium)
-    logs.append("[\(timestamp)] \(message)")
-    if logs.count > 100 {
-      logs.removeFirst()
-    }
+    logsManager.log(message)
   }
 
   func stop() async {

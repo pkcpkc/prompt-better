@@ -76,3 +76,19 @@ enum OpenAI {
         }
     }
 }
+
+extension OpenAI.ChatCompletionRequest {
+    var systemInstructions: String {
+        messages
+            .filter { $0.role == "system" }
+            .map { $0.content }
+            .joined(separator: "\n\n")
+    }
+
+    var combinedPrompt: String {
+        messages
+            .filter { $0.role != "system" }
+            .map { $0.content }
+            .joined(separator: "\n\n")
+    }
+}

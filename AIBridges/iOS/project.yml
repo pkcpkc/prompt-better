@@ -55,4 +55,7 @@ targets:
         # App icon asset name
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: Sources/App/Info.plist
+        # Disable App Sandboxing for local developer server functionality and debugging
+        ENABLE_APP_SANDBOX: "NO"
+        CODE_SIGN_ENTITLEMENTS: macAIBridge.entitlements
 

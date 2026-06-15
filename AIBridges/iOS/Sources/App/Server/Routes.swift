@@ -10,8 +10,8 @@ func routes(_ app: Application) throws {
     app.post("v1", "chat", "completions") { req async throws in
         let completionRequest = try req.content.decode(OpenAI.ChatCompletionRequest.self)
         
-        // Prepare the prompt by combining message contents (Raw text for parity)
-        let combinedPrompt = completionRequest.messages.map { $0.content }.joined(separator: "\n\n")
+        let systemInstructions = completionRequest.systemInstructions
+        let combinedPrompt = completionRequest.combinedPrompt
         
         // Prepare options
         var options = GenerationOptions()
@@ -30,7 +30,7 @@ func routes(_ app: Application) throws {
         }
 
         // Call native LanguageModelSession directly to ensure statelessness
-        let session = LanguageModelSession()
+        let session = systemInstructions.isEmpty ? LanguageModelSession() : LanguageModelSession(instructions: systemInstructions)
         let response = try await session.respond(to: combinedPrompt, options: options)
         let responseText = response.content
         

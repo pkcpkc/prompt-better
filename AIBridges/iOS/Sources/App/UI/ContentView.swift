@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
   @EnvironmentObject var serverManager: ServerManager
+  @State private var showChat = false
 
   var body: some View {
     NavigationStack {
@@ -41,39 +42,57 @@ struct ContentView: View {
         
 
 
-        VStack(alignment: .leading) {
-          Text("Logs")
-            .font(.headline)
-            .padding(.horizontal)
+        LogsView(logsManager: serverManager.logsManager)
 
-          ScrollViewReader { proxy in
-            ScrollView {
-              LazyVStack(alignment: .leading, spacing: 5) {
-                ForEach(serverManager.logs.indices, id: \.self) { index in
-                  Text(serverManager.logs[index])
-                    .font(.system(.caption, design: .monospaced))
-                    .padding(.horizontal)
-                }
-              }
+        // Bottom button actions row (destructive left, primary right)
+        HStack {
+          Button(action: {
+            serverManager.logsManager.clear()
+          }) {
+            HStack(spacing: 8) {
+              Image(systemName: "trash.fill")
+              Text("Clear Logs")
+                .fontWeight(.bold)
             }
-            .onChange(of: serverManager.logs.count) {
-              if let lastIndex = serverManager.logs.indices.last {
-                withAnimation {
-                  proxy.scrollTo(lastIndex)
-                }
-              }
-            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.red)
+            .cornerRadius(24)
+            .shadow(color: Color.red.opacity(0.3), radius: 6, x: 0, y: 4)
           }
-          .background(Color.gray.opacity(0.1))
-          .cornerRadius(8)
-          .padding(.horizontal)
-        }
+          .buttonStyle(.plain)
+          .padding(.leading, 20)
 
-        Spacer()
+          Spacer()
+
+          Button(action: {
+            showChat = true
+          }) {
+            HStack(spacing: 8) {
+              Image(systemName: "bubble.left.and.bubble.right.fill")
+              Text("Chat")
+                .fontWeight(.bold)
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.green)
+            .cornerRadius(24)
+            .shadow(color: Color.green.opacity(0.3), radius: 6, x: 0, y: 4)
+          }
+          .buttonStyle(.plain)
+          .padding(.trailing, 20)
+        }
+        .padding(.bottom, 20)
       }
 #if os(iOS)
       .toolbar(.hidden, for: .navigationBar)
 #endif
+      .sheet(isPresented: $showChat) {
+        ChatWindowView()
+          .environmentObject(serverManager)
+      }
     }
   }
 
@@ -108,5 +127,42 @@ struct ContentView: View {
     .cornerRadius(12)
     .shadow(radius: 2)
     .padding()
+  }
+}
+
+struct LogsView: View {
+  @ObservedObject var logsManager: LogsManager
+
+  var body: some View {
+    VStack(alignment: .leading) {
+      Text("Logs")
+        .font(.headline)
+        .padding(.horizontal)
+
+      ScrollViewReader { proxy in
+        ScrollView {
+          LazyVStack(alignment: .leading, spacing: 5) {
+            ForEach(logsManager.logs) { log in
+              Text(log.text)
+                .font(.system(.caption, design: .monospaced))
+                .padding(.horizontal)
+                .id(log.id)
+            }
+          }
+        }
+        .onChange(of: logsManager.logs) { oldValue, newValue in
+          if let last = newValue.last {
+            DispatchQueue.main.async {
+              withAnimation {
+                proxy.scrollTo(last.id)
+              }
+            }
+          }
+        }
+      }
+      .background(Color.gray.opacity(0.1))
+      .cornerRadius(8)
+      .padding(.horizontal)
+    }
   }
 }

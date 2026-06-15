@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		18BF17FAB72643F4FA692121 /* ChatWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477221B79AE4ABC47A2C2569 /* ChatWindowView.swift */; };
 		2A110DAE8EC509F18EEDD03C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE4A7A20FC4E10719A2E211 /* ContentView.swift */; };
 		2F42F7A88D6A717E00E7A4F4 /* OpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F58DCB68B7B0CA4245EC1F1 /* OpenAI.swift */; };
 		3907A718ECDAA0565E34101D /* OpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F58DCB68B7B0CA4245EC1F1 /* OpenAI.swift */; };
@@ -20,6 +21,7 @@
 		993CF579B2393835F5C5B348 /* Routes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E29223531F297B6D1A3B53 /* Routes.swift */; };
 		A593DA5D22D0B5835E3BF284 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7AE3ABA129928302E475C584 /* Assets.xcassets */; };
 		B2C39C8BD18A1003A9D64991 /* Routes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E29223531F297B6D1A3B53 /* Routes.swift */; };
+		E921481F1C998F2127A914A1 /* ChatWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477221B79AE4ABC47A2C2569 /* ChatWindowView.swift */; };
 		EDE1587A50DEAFE3740A7D2B /* Vapor in Frameworks */ = {isa = PBXBuildFile; productRef = F467BFFB02312FC46717D894 /* Vapor */; };
 		FA3998AE27AA18A1ED613216 /* LaunchScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2301FE42303E969E591421 /* LaunchScreenView.swift */; };
 		FA476FE264A926509E7A7477 /* AIPromptCore in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 6AA28B7CC766DC66365C650C /* AIPromptCore */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -57,6 +59,7 @@
 		1465ABAF82AE60506979E536 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1A2301FE42303E969E591421 /* LaunchScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchScreenView.swift; sourceTree = "<group>"; };
 		3F58DCB68B7B0CA4245EC1F1 /* OpenAI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAI.swift; sourceTree = "<group>"; };
+		477221B79AE4ABC47A2C2569 /* ChatWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatWindowView.swift; sourceTree = "<group>"; };
 		56E29223531F297B6D1A3B53 /* Routes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routes.swift; sourceTree = "<group>"; };
 		5DE4A7A20FC4E10719A2E211 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		7AE3ABA129928302E475C584 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -90,6 +93,7 @@
 		30D5582E8CDE77E94605063E /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				477221B79AE4ABC47A2C2569 /* ChatWindowView.swift */,
 				5DE4A7A20FC4E10719A2E211 /* ContentView.swift */,
 				89F3F42A36EE93043DC187FD /* iOSAIBridgeApp.swift */,
 				1A2301FE42303E969E591421 /* LaunchScreenView.swift */,
@@ -258,6 +262,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				18BF17FAB72643F4FA692121 /* ChatWindowView.swift in Sources */,
 				FD65D42D3CD1816DAF1B2197 /* ContentView.swift in Sources */,
 				778AEB993ECCC9A7E47D2C0C /* LaunchScreenView.swift in Sources */,
 				3907A718ECDAA0565E34101D /* OpenAI.swift in Sources */,
@@ -270,6 +275,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E921481F1C998F2127A914A1 /* ChatWindowView.swift in Sources */,
 				2A110DAE8EC509F18EEDD03C /* ContentView.swift in Sources */,
 				FA3998AE27AA18A1ED613216 /* LaunchScreenView.swift in Sources */,
 				2F42F7A88D6A717E00E7A4F4 /* OpenAI.swift in Sources */,
@@ -432,7 +438,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = macAIBridge.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
 				INFOPLIST_FILE = Sources/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -warn-concurrency -Xfrontend -enable-actor-data-race-checks";
@@ -445,7 +453,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = macAIBridge.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = NO;
 				INFOPLIST_FILE = Sources/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -warn-concurrency -Xfrontend -enable-actor-data-race-checks";

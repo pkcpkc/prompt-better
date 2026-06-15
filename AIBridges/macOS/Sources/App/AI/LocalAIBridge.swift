@@ -9,10 +9,8 @@ final class LocalAIBridge {
 
   /// Generates a response using the local FoundationModels framework.
   func generate(request: OpenAI.ChatCompletionRequest) async throws -> String {
-    let session = LanguageModelSession()
-
-    // Prepare the prompt by combining messages seamlessly
-    let combinedPrompt = request.messages.map { $0.content }.joined(separator: "\n\n")
+    let systemInstructions = request.systemInstructions
+    let combinedPrompt = request.combinedPrompt
 
     // Create the generation options from the request
     var options = GenerationOptions()
@@ -27,7 +25,8 @@ final class LocalAIBridge {
     }
     // stopSequences not supported in this version of Mac SDK
 
-    // Use the direct String-based respond method for maximum simplicity
+    // Use the direct String-based respond method with native instructions
+    let session = systemInstructions.isEmpty ? LanguageModelSession() : LanguageModelSession(instructions: systemInstructions)
     let response = try await session.respond(
       to: combinedPrompt,
       options: options
