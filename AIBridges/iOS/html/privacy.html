@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datenschutz & Privacy Policy - AI Model Bridge</title>
+    <style>
+        /* Modern CSS Custom Properties & Reset */
+        :root {
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-color: #1f2937;
+            --text-muted: #4b5563;
+            --primary: #4f46e5;
+            --primary-light: #e0e7ff;
+            --border-color: #e5e7eb;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --accent-bg: rgba(79, 70, 229, 0.05);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0b0f19;
+                --card-bg: #111827;
+                --text-color: #f3f4f6;
+                --text-muted: #9ca3af;
+                --primary: #6366f1;
+                --primary-light: #1e1b4b;
+                --border-color: #1f2937;
+                --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+                --accent-bg: rgba(99, 102, 241, 0.05);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 24px 16px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 680px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 36px 32px;
+            box-shadow: var(--shadow);
+            margin: 20px auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 28px;
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            font-weight: 500;
+        }
+
+        /* iOS-style Segmented Language Switcher */
+        .lang-switch-container {
+            display: flex;
+            justify-content: center;
+        }
+
+        .lang-switch {
+            display: inline-flex;
+            background: var(--border-color);
+            padding: 3px;
+            border-radius: 9999px;
+            position: relative;
+        }
+
+        .lang-switch button {
+            background: none;
+            border: none;
+            padding: 8px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-muted);
+            border-radius: 9999px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            z-index: 2;
+        }
+
+        .lang-switch button.active {
+            color: var(--text-color);
+            background: var(--card-bg);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+        }
+
+        .content-section.active {
+            display: block;
+            animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            font-size: 19px;
+            font-weight: 700;
+            margin: 28px 0 14px 0;
+            color: var(--primary);
+            letter-spacing: -0.3px;
+        }
+
+        h2:first-of-type {
+            margin-top: 0;
+        }
+
+        p {
+            margin-bottom: 16px;
+            font-size: 15px;
+            color: var(--text-color);
+        }
+
+        ul {
+            margin: 0 0 20px 24px;
+        }
+
+        li {
+            margin-bottom: 8px;
+            font-size: 15px;
+            color: var(--text-color);
+        }
+
+        .highlight-box {
+            background-color: var(--primary-light);
+            border-left: 4px solid var(--primary);
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 28px;
+        }
+
+        .highlight-box p {
+            margin-bottom: 0;
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 14.5px;
+        }
+
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        
+        .contact-info {
+            background: var(--accent-bg);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            border-radius: 10px;
+            margin-top: 16px;
+        }
+
+        .contact-info p {
+            margin-bottom: 0;
+        }
+
+        .note-dev {
+            font-style: italic;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            display: block;
+        }
+
+        /* Accessibility: focus ring styling */
+        button:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1 id="title-text">Datenschutzerklärung</h1>
+        <div class="subtitle">AI Model Bridge App</div>
+        
+        <div class="lang-switch-container">
+            <div class="lang-switch">
+                <button id="btn-de" class="active" onclick="switchLanguage('de')">Deutsch</button>
+                <button id="btn-en" onclick="switchLanguage('en')">English</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- GERMAN VERSION (DSGVO / GDPR) -->
+    <div id="section-de" class="content-section active">
+        <div class="highlight-box">
+            <p><strong>Kurz und transparent:</strong> Diese App funktioniert vollständig lokal auf Ihrem Gerät und sendet keinerlei Daten an externe Server. Ihre Privatsphäre ist standardmäßig zu 100 % geschützt.</p>
+        </div>
+
+        <h2>1. Allgemeine Informationen</h2>
+        <p>Der Schutz Ihrer persönlichen Daten ist uns ein wichtiges Anliegen. Diese Datenschutzerklärung informiert Sie über den Umgang mit Daten bei der Nutzung der iOS-App <strong>AI Model Bridge</strong> (nachfolgend „App“).</p>
+        <p>Da die App ausschließlich lokal auf Ihrem Gerät ausgeführt wird und keine personenbezogenen Daten an uns oder Dritte überträgt, findet keine Erfassung durch eine zentrale Stelle statt. Bei Fragen zum Datenschutz können Sie uns unter der unten angegebenen Kontaktadresse erreichen.</p>
+
+        <h2>2. Lokale Verarbeitung (Offline-Betrieb)</h2>
+        <p>Die App wurde nach dem Prinzip „Privacy by Design“ (Datenschutz durch Technikgestaltung) entwickelt:</p>
+        <ul>
+            <li><strong>Keine Datenübertragung:</strong> Es werden keine personenbezogenen Daten (wie IP-Adressen, Namen, E-Mail-Adressen, Gerätekennungen oder Standortdaten) erhoben, gespeichert oder an externe Server übermittelt.</li>
+            <li><strong>Lokale Ausführung:</strong> Alle Berechnungen, künstliche Intelligenz (KI), Prompt-Verarbeitungen, Logiken, Eingaben und Ausgaben werden ausschließlich auf Ihrem Endgerät ausgeführt.</li>
+            <li><strong>Keine Cloud-Speicherung:</strong> Sämtliche Daten, die Sie in die App eingeben oder generieren, verbleiben ausschließlich im geschützten lokalen Speicher der App auf Ihrem Gerät.</li>
+        </ul>
+
+        <h2>3. Keine Analysedienste oder Werbung</h2>
+        <p>Um Ihre Privatsphäre zu schützen, verzichtet diese App vollständig auf:</p>
+        <ul>
+            <li>Drittanbieter-Tracking-Tools (wie Google Analytics, Firebase Analytics, Flurry o.ä.).</li>
+            <li>Werbenetzwerke oder Werbe-Tracking.</li>
+            <li>Social-Media-Plugins oder sonstige externe Bibliotheken, die Benutzerdaten abgreifen könnten.</li>
+        </ul>
+
+        <h2>4. Geräteberechtigungen</h2>
+        <p>Die App benötigt für manche Funktionen Zugriff auf bestimmte Systemschnittstellen Ihres iOS-Geräts. Diese Berechtigungen werden ausschließlich für den lokalen Betrieb verwendet:</p>
+        <ul>
+            <li><strong>Lokales Netzwerk (Local Network):</strong> Falls die App mit lokalen Entwicklerschnittstellen oder einem lokalen API-Server kommunizieren muss, erfolgt dies rein innerhalb Ihres lokalen Heimnetzwerks bzw. auf Ihrem Gerät selbst (Localhost). Es werden keine Daten ins Internet gesendet.</li>
+            <li><strong>Dateizugriff / Speicher (Storage):</strong> Dient dem Laden oder Speichern lokaler Konfigurationsdateien, Dokumente oder Modelle auf Ihrem Gerät.</li>
+        </ul>
+
+        <h2>5. Konformität mit EU-Recht (DSGVO / GDPR)</h2>
+        <p>Da wir keinerlei personenbezogene Daten von Ihnen erfassen, speichern oder verarbeiten, sind die Anforderungen der Datenschutz-Grundverordnung (DSGVO) in vollem Umfang gewahrt:</p>
+        <ul>
+            <li><strong>Betroffenenrechte (Art. 15-21 DSGVO):</strong> Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit. Da wir jedoch keine Daten von Ihnen besitzen, können wir keine Daten bereitstellen oder löschen. Ihre Daten gehören Ihnen und liegen ausschließlich auf Ihrem Gerät. Sie können die Daten jederzeit selbst löschen, indem Sie die App deinstallieren oder die lokalen Daten in den App-Einstellungen löschen.</li>
+            <li><strong>Datenminimierung (Art. 5 Abs. 1 lit. c DSGVO):</strong> Durch den vollständigen Verzicht auf Datenerhebung wird diesem Grundsatz optimal entsprochen.</li>
+        </ul>
+
+        <h2>6. Konformität mit US-Recht (CCPA / CPRA / CalOPPA)</h2>
+        <p>Die App entspricht den Anforderungen des California Consumer Privacy Act (CCPA) und des California Privacy Rights Act (CPRA):</p>
+        <ul>
+            <li><strong>Kein Verkauf & keine Weitergabe:</strong> Wir verkaufen oder teilen keine personenbezogenen Daten („We do not sell or share personal information“).</li>
+            <li><strong>Keine Datensammlung:</strong> Da keine personenbezogenen Informationen erhoben werden, entfällt das Risiko eines unbefugten Datenabflusses.</li>
+        </ul>
+
+        <h2>7. Kontakt & Verantwortlicher</h2>
+        <p>Sollten Sie Fragen oder Anregungen zum Datenschutz dieser App haben, wenden Sie sich bitte an den Entwickler:</p>
+        <div class="contact-info">
+            <p><strong>E-Mail:</strong> <a href="mailto:paul.hackenberger+ai_bridge@gmail.com" style="color: var(--primary); text-decoration: none; font-weight: 500;">paul.hackenberger+ai_bridge@gmail.com</a></p>
+        </div>
+    </div>
+
+    <!-- ENGLISH VERSION (GDPR / CCPA) -->
+    <div id="section-en" class="content-section">
+        <div class="highlight-box">
+            <p><strong>In short:</strong> This app runs entirely locally on your device and does not send any data to external servers. Your privacy is protected by default.</p>
+        </div>
+
+        <h2>1. General Information</h2>
+        <p>Protecting your privacy is of utmost importance to us. This Privacy Policy informs you about how data is handled when using the iOS application <strong>AI Model Bridge</strong> (hereinafter referred to as the "App").</p>
+        <p>Because this App runs fully locally on your device and does not transmit any personal data to us or third parties, there is no centralized data processing. If you have any privacy-related questions, you can contact us at the address provided below.</p>
+
+        <h2>2. Local Processing (Offline Operation)</h2>
+        <p>The App is designed in accordance with "Privacy by Design" principles:</p>
+        <ul>
+            <li><strong>No Data Transmission:</strong> No personal data (such as IP addresses, names, email addresses, device identifiers, or location data) is collected, stored, or transmitted to external servers.</li>
+            <li><strong>On-Device Execution:</strong> All calculations, artificial intelligence (AI) processing, prompt evaluation, logic, inputs, and outputs run locally on your device.</li>
+            <li><strong>No Cloud Storage:</strong> All data you input or generate remains stored exclusively within the secure local storage of the App on your device.</li>
+        </ul>
+
+        <h2>3. No Analytics or Advertising</h2>
+        <p>To ensure maximum privacy, this App does not contain:</p>
+        <ul>
+            <li>Third-party tracking tools (such as Google Analytics, Firebase Analytics, Flurry, etc.).</li>
+            <li>Advertising networks or ad tracking SDKs.</li>
+            <li>Social media plugins or external libraries that collect user data.</li>
+        </ul>
+
+        <h2>4. Device Permissions</h2>
+        <p>To provide specific features, the App might request access to iOS system permissions. These are used purely locally:</p>
+        <ul>
+            <li><strong>Local Network:</strong> If the App needs to communicate with local developer interfaces or a local API server, it does so strictly within your home network or on your device (localhost). No data is sent to the internet.</li>
+            <li><strong>File System / Storage:</strong> Used strictly to load or save configuration files, local document imports, or local models.</li>
+        </ul>
+
+        <h2>5. Compliance with EU Law (GDPR)</h2>
+        <p>Since we do not collect, store, or process any personal data, all GDPR requirements are met by design:</p>
+        <ul>
+            <li><strong>User Rights (Articles 15-21 GDPR):</strong> You have the right to access, rectify, erase, restrict processing, and port your data. Since we do not possess any of your data, we cannot retrieve or delete it for you. Your data is entirely under your control. You can delete all local data at any time by uninstalling the App or clearing its data via iOS settings.</li>
+            <li><strong>Data Minimization (Art. 5(1)(c) GDPR):</strong> Fully implemented by collecting zero data.</li>
+        </ul>
+
+        <h2>6. Compliance with US Law (CCPA / CPRA / CalOPPA)</h2>
+        <p>The App complies with the California Consumer Privacy Act (CCPA) and the California Privacy Rights Act (CPRA):</p>
+        <ul>
+            <li><strong>No Sale or Sharing of Personal Info:</strong> We do not sell or share personal information.</li>
+            <li><strong>No Collection of Consumer Info:</strong> No categories of consumer personal information are collected.</li>
+        </ul>
+
+        <h2>7. Contact</h2>
+        <p>If you have any questions regarding this privacy policy, please contact the developer:</p>
+        <div class="contact-info">
+            <p><strong>Email:</strong> <a href="mailto:paul.hackenberger+ai_bridge@gmail.com" style="color: var(--primary); text-decoration: none; font-weight: 500;">paul.hackenberger+ai_bridge@gmail.com</a></p>
+        </div>
+    </div>
+
+    <footer>
+        <span id="footer-text">Zuletzt aktualisiert: Juni 2026 / Last Updated: June 2026</span>
+    </footer>
+</div>
+
+<script>
+    function switchLanguage(lang) {
+        document.getElementById('btn-de').classList.remove('active');
+        document.getElementById('btn-en').classList.remove('active');
+        
+        document.getElementById('section-de').classList.remove('active');
+        document.getElementById('section-en').classList.remove('active');
+        
+        if (lang === 'de') {
+            document.getElementById('btn-de').classList.add('active');
+            document.getElementById('section-de').classList.add('active');
+            document.getElementById('title-text').innerText = 'Datenschutzerklärung';
+        } else {
+            document.getElementById('btn-en').classList.add('active');
+            document.getElementById('section-en').classList.add('active');
+            document.getElementById('title-text').innerText = 'Privacy Policy';
+        }
+    }
+</script>
+
+</body>
+</html>
