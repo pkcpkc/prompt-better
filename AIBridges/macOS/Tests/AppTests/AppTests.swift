@@ -27,8 +27,65 @@ final class AppTests: XCTestCase {
     try await app.test(.GET, "v1/models") { res async throws in
       XCTAssertEqual(res.status, .ok)
       let models = try res.content.decode(OpenAI.ModelListResponse.self)
-      XCTAssertFalse(models.data.isEmpty)
-      XCTAssertTrue(models.data.contains { $0.id == "apple-intelligence" })
+      
+      #if canImport(ClaudeForFoundationModels)
+      XCTAssertEqual(models.data.count, 2)
+      XCTAssertTrue(models.data.contains { $0.id == "apple_intelligence_on_device" })
+      XCTAssertTrue(models.data.contains { $0.id == "apple_intelligence_private_cloud" })
+      #else
+      // OS 26 target has only the on-device model visible to prevent user confusion
+      XCTAssertEqual(models.data.count, 1)
+      XCTAssertEqual(models.data.first?.id, "apple_intelligence_on_device")
+      #endif
     }
+  }
+
+  func testChatCompletionWithSpecificModels() async throws {
+    // 1. Verify on-device model completion succeeds
+    let validRequest = OpenAI.ChatCompletionRequest(
+      model: "apple_intelligence_on_device",
+      messages: [
+        .init(role: "user", content: "Say hello")
+      ],
+      temperature: nil,
+      topP: nil,
+      maxTokens: 10,
+      stream: nil,
+      stop: nil
+    )
+    
+    try await app.test(.POST, "v1/chat/completions", beforeRequest: { req in
+      try req.content.encode(validRequest)
+    }) { res async throws in
+      XCTAssertEqual(res.status, .ok)
+      let response = try res.content.decode(OpenAI.ChatCompletionResponse.self)
+      XCTAssertEqual(response.model, "apple_intelligence_on_device")
+      XCTAssertFalse(response.choices.isEmpty)
+    }
+
+    // 2. Verify that unavailable models (like PCC under OS 26 compilation) are rejected
+    #if !canImport(ClaudeForFoundationModels)
+    let invalidRequest = OpenAI.ChatCompletionRequest(
+      model: "apple_intelligence_private_cloud",
+      messages: [
+        .init(role: "user", content: "Say hello")
+      ],
+      temperature: nil,
+      topP: nil,
+      maxTokens: 10,
+      stream: nil,
+      stop: nil
+    )
+    
+    try await app.test(.POST, "v1/chat/completions", beforeRequest: { req in
+      try req.content.encode(invalidRequest)
+    }) { res async throws in
+      XCTAssertEqual(res.status, .notFound)
+      let errorResponse = try res.content.decode(OpenAI.ErrorResponse.self)
+      XCTAssertEqual(errorResponse.error.code, "api_error")
+      XCTAssertEqual(errorResponse.error.type, "api_error")
+      XCTAssertTrue(errorResponse.error.message.contains("not found"))
+    }
+    #endif
   }
 }
