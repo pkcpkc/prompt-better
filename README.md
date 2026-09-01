@@ -72,7 +72,7 @@ The framework resolves configurations hierarchically: CLI arguments > Environmen
    {
      "student": {
        "base_url": "http://127.0.0.1:8080/v1",
-       "model": "apple_foundation_model_3_core_3b",
+       "model": "apple-foundation-model-3-core-3b",
        "temperature": 0.2
      },
      "teacher": {
@@ -572,7 +572,7 @@ Defines expected ground truth values and human-written grading rubrics.
 ### Environment Variables
 
 - `PROMPT_BETTER_STUDENT_BASE_URL`: API root for student completions (e.g. Vapor server: `http://localhost:8080/v1`).
-- `PROMPT_BETTER_STUDENT_MODEL`: Model ID identifier (e.g. `apple_foundation_model_3_core_3b` or `apple_intelligence_private_cloud_compute`).
+- `PROMPT_BETTER_STUDENT_MODEL`: Model ID identifier (e.g. `apple-foundation-model-3-core-3b` or `apple-intelligence-private-cloud-compute`).
 - `PROMPT_BETTER_STUDENT_API_KEY`: Key used for authentication (optional/blank for localhost).
 - `PROMPT_BETTER_STUDENT_TEMPERATURE`: Default temperature for student model completion calls (defaults to `0.2`).
 - `PROMPT_BETTER_TEACHER_BASE_URL`: API root for the cloud teacher model (e.g. `https://api.openai.com/v1`).

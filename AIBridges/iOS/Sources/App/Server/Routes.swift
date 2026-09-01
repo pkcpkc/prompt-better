@@ -149,49 +149,79 @@ func routes(_ app: Application) throws {
     }
 }
 
-// MARK: - Model Registry & Dynamic Detection
+// MARK: - Model Names & Registry
+
+public enum ModelName: String, CaseIterable, Sendable {
+    case afm3Core3B = "apple-foundation-model-3-core-3b"
+    case afm3CoreAdvanced20BSparse = "apple-foundation-model-3-core-advanced-20b-sparse"
+    case privateCloudCompute = "apple-intelligence-private-cloud-compute"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .afm3Core3B:
+            return "AFM 3 Core (3B)"
+        case .afm3CoreAdvanced20BSparse:
+            return "AFM 3 Core Advanced (20B Sparse)"
+        case .privateCloudCompute:
+            return "Private Cloud Compute (PCC)"
+        }
+    }
+}
 
 public enum ModelRegistry {
-    public static var onDeviceModelId: String {
+    public typealias Model = ModelName
+
+    public static var onDeviceModel: ModelName {
         let osVersion = ProcessInfo.processInfo.operatingSystemVersion
         let ramBytes = ProcessInfo.processInfo.physicalMemory
         let ramGB = Double(ramBytes) / (1024.0 * 1024.0 * 1024.0)
         
         // iOS 27+ / macOS 27+ with >= 12 GB RAM
         if osVersion.majorVersion >= 27 && ramGB >= 12.0 {
-            return "apple_foundation_model_3_core_advanced_20b_sparse"
+            return .afm3CoreAdvanced20BSparse
         } else {
-            return "apple_foundation_model_3_core_3b"
+            return .afm3Core3B
         }
     }
     
-    public static let privateCloudComputeModelId = "apple_intelligence_private_cloud_compute"
+    public static var onDeviceModelId: String {
+        onDeviceModel.rawValue
+    }
     
-    public static var availableModelIds: [String] {
-        return [
-            onDeviceModelId,
-            privateCloudComputeModelId
+    public static let privateCloudComputeModel: ModelName = .privateCloudCompute
+    public static let privateCloudComputeModelId: String = ModelName.privateCloudCompute.rawValue
+    
+    public static var availableModels: [ModelName] {
+        [
+            onDeviceModel,
+            privateCloudComputeModel
         ]
     }
 
+    public static var availableModelIds: [String] {
+        availableModels.map(\.rawValue)
+    }
+
     public static func resolveModel(name: String) -> any LanguageModel {
-        if name == privateCloudComputeModelId {
-            return PrivateCloudComputeLanguageModel()
+        guard let model = ModelName(rawValue: name) else {
+            return SystemLanguageModel.default
         }
-        return SystemLanguageModel.default
+        return resolveModel(model: model)
+    }
+
+    public static func resolveModel(model: ModelName) -> any LanguageModel {
+        switch model {
+        case .privateCloudCompute:
+            return PrivateCloudComputeLanguageModel()
+        case .afm3Core3B, .afm3CoreAdvanced20BSparse:
+            return SystemLanguageModel.default
+        }
     }
 
     public static func displayName(for modelId: String) -> String {
-        switch modelId {
-        case "apple_foundation_model_3_core_advanced_20b_sparse":
-            return "AFM 3 Core Advanced (20B Sparse)"
-        case "apple_foundation_model_3_core_3b":
-            return "AFM 3 Core (3B)"
-        case "apple_intelligence_private_cloud_compute":
-            return "Private Cloud Compute (PCC)"
-        default:
-            return modelId
-        }
+        ModelName(rawValue: modelId)?.displayName ?? modelId
     }
 }
 

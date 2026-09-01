@@ -1,7 +1,7 @@
 {
   "student": {
     "base_url": "http://localhost:8080/v1",
-    "model": "apple_foundation_model_3_core_3b"
+    "model": "apple-foundation-model-3-core-3b"
   },
   "student_desc": "The target LLM endpoint whose prompt instructions will be optimized.",
   "teacher": {

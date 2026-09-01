@@ -348,7 +348,7 @@ class ConfigTests(unittest.TestCase):
         
         config = EndpointConfig(
             base_url="http://localhost:8080/v1",
-            model="apple_foundation_model_3_core_3b",
+            model="apple-foundation-model-3-core-3b",
             api_key="key",
             temperature=0.4
         )
@@ -358,7 +358,7 @@ class ConfigTests(unittest.TestCase):
         # 1. Uses config temperature if no override passed
         _build_lm(mock_dspy, config)
         mock_dspy.LM.assert_called_with(
-            "openai/apple_foundation_model_3_core_3b",
+            "openai/apple-foundation-model-3-core-3b",
             api_key="key",
             api_base="http://localhost:8080/v1",
             model_type="chat",
@@ -368,7 +368,7 @@ class ConfigTests(unittest.TestCase):
         # 2. Uses override temperature if passed
         _build_lm(mock_dspy, config, temperature=0.7)
         mock_dspy.LM.assert_called_with(
-            "openai/apple_foundation_model_3_core_3b",
+            "openai/apple-foundation-model-3-core-3b",
             api_key="key",
             api_base="http://localhost:8080/v1",
             model_type="chat",

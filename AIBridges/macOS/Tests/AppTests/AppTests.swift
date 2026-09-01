@@ -30,12 +30,12 @@ final class AppTests: XCTestCase {
       
       XCTAssertEqual(models.data.count, 2)
       XCTAssertTrue(models.data.contains { $0.id == ModelRegistry.onDeviceModelId })
-      XCTAssertTrue(models.data.contains { $0.id == "apple_intelligence_private_cloud_compute" })
+      XCTAssertTrue(models.data.contains { $0.id == ModelName.privateCloudCompute.rawValue })
       
       // Ensure on-device is either 3B or 20B advanced sparse
       XCTAssertTrue(
-        ModelRegistry.onDeviceModelId == "apple_foundation_model_3_core_3b" ||
-        ModelRegistry.onDeviceModelId == "apple_foundation_model_3_core_advanced_20b_sparse"
+        ModelRegistry.onDeviceModelId == ModelName.afm3Core3B.rawValue ||
+        ModelRegistry.onDeviceModelId == ModelName.afm3CoreAdvanced20BSparse.rawValue
       )
     }
   }
@@ -65,7 +65,7 @@ final class AppTests: XCTestCase {
 
     // 2. Verify Private Cloud Compute model completion succeeds
     let pccRequest = OpenAI.ChatCompletionRequest(
-      model: "apple_intelligence_private_cloud_compute",
+      model: ModelName.privateCloudCompute.rawValue,
       messages: [
         .init(role: "user", content: "Say hello via PCC")
       ],
@@ -81,7 +81,7 @@ final class AppTests: XCTestCase {
     }) { res async throws in
       XCTAssertEqual(res.status, .ok)
       let response = try res.content.decode(OpenAI.ChatCompletionResponse.self)
-      XCTAssertEqual(response.model, "apple_intelligence_private_cloud_compute")
+      XCTAssertEqual(response.model, ModelName.privateCloudCompute.rawValue)
       XCTAssertFalse(response.choices.isEmpty)
     }
 

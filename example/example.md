@@ -81,7 +81,7 @@ Settings are defined in [example/prompt-better.json](prompt-better.json). It tar
 {
   "student": {
     "base_url": "http://localhost:8080/v1",
-    "model": "apple_foundation_model_3_core_3b"
+    "model": "apple-foundation-model-3-core-3b"
   },
   "teacher": {
     "base_url": "https://api.openai.com/v1",
