@@ -7,8 +7,8 @@ Welcome, Agent! Below are instructions and guidelines for working in the `prompt
 We use **`mise`** (formerly `rtx`) to manage the development environment (Python `3.11`, `uv` package manager).
 
 ### Running Commands
-
-When executing Python, `uv`, or test commands, prefix them with `mise exec` to ensure the correct workspace environment is used:
+ 
+When executing Python, `uv`, or test commands, prefix them with `mise exec` to ensure the correct workspace environment is used. Because `mise` and toolchains reside outside the repository in user directories, execute these commands with `BypassSandbox: true` (unsandboxed):
 
 ```bash
 # Example: Install/update dependencies

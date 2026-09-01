@@ -1,17 +1,16 @@
-from __future__ import annotations
-import inspect
 import importlib
 import importlib.util
+import inspect
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .models import OptimizationConfig
 
 
 class BaseOptimizer:
     """Base class for prompt optimization.
-    
+
     Users can subclass this to customize how DSPy modules (or other prompts) are optimized.
     """
 
@@ -19,11 +18,11 @@ class BaseOptimizer:
         self,
         config: OptimizationConfig,
         spec: Any,
-        specs: Dict[str, Any],
+        specs: dict[str, Any],
         student_lm: Any,
         teacher_lm: Any,
-        trainset: List[Any],
-        evalset: List[Any],
+        trainset: list[Any],
+        evalset: list[Any],
         metric: Any,
         module: Any,
     ) -> Any:
@@ -38,18 +37,19 @@ class DefaultOptimizer(BaseOptimizer):
         self,
         config: OptimizationConfig,
         spec: Any,
-        specs: Dict[str, Any],
+        specs: dict[str, Any],
         student_lm: Any,
         teacher_lm: Any,
-        trainset: List[Any],
-        evalset: List[Any],
+        trainset: list[Any],
+        evalset: list[Any],
         metric: Any,
         module: Any,
     ) -> Any:
         import dspy
+
         from prompt_better.prompt_json import to_dspy_examples
 
-        optimizer_kwargs: Dict[str, Any] = {
+        optimizer_kwargs: dict[str, Any] = {
             "metric": metric,
             "auto": config.auto_mode,
             "num_threads": config.num_threads,
@@ -65,7 +65,7 @@ class DefaultOptimizer(BaseOptimizer):
 
         optimizer = dspy.MIPROv2(**optimizer_kwargs)
 
-        compile_kwargs: Dict[str, Any] = {
+        compile_kwargs: dict[str, Any] = {
             "trainset": to_dspy_examples(dspy, trainset, spec, specs),
             "valset": to_dspy_examples(dspy, evalset, spec, specs),
             "requires_permission_to_run": config.requires_permission_to_run,
@@ -78,10 +78,58 @@ class DefaultOptimizer(BaseOptimizer):
         return optimizer.compile(module, **compile_kwargs)
 
 
-def load_optimizer(optimizer_path: Optional[str]) -> BaseOptimizer:
+class GepaOptimizer(BaseOptimizer):
+    """Reflective prompt optimizer using DSPy's GEPA compiler."""
+
+    def compile(
+        self,
+        config: OptimizationConfig,
+        spec: Any,
+        specs: dict[str, Any],
+        student_lm: Any,
+        teacher_lm: Any,
+        trainset: list[Any],
+        evalset: list[Any],
+        metric: Any,
+        module: Any,
+    ) -> Any:
+        import dspy
+
+        from prompt_better.prompt_json import to_dspy_examples
+
+        optimizer_kwargs: dict[str, Any] = {
+            "metric": metric,
+            "auto": config.auto_mode,
+            "num_threads": config.num_threads,
+        }
+        if teacher_lm is not None:
+            optimizer_kwargs["reflection_lm"] = teacher_lm
+        if config.num_trials is not None:
+            optimizer_kwargs["max_metric_calls"] = config.num_trials
+
+        optimizer = dspy.GEPA(**optimizer_kwargs)
+
+        compile_kwargs: dict[str, Any] = {
+            "trainset": to_dspy_examples(dspy, trainset, spec, specs),
+            "valset": to_dspy_examples(dspy, evalset, spec, specs),
+        }
+
+        return optimizer.compile(module, **compile_kwargs)
+
+
+def load_optimizer(optimizer_path: str | None) -> BaseOptimizer:
     """Dynamically load an Optimizer instance from a class path or file path."""
-    if not optimizer_path or optimizer_path in ("predict", "chain-of-thought"):
+    if not optimizer_path or optimizer_path.lower() in (
+        "predict",
+        "chain-of-thought",
+        "mipro",
+        "miprov2",
+        "default",
+    ):
         return DefaultOptimizer()
+
+    if optimizer_path.lower() == "gepa":
+        return GepaOptimizer()
 
 
 

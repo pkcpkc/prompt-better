@@ -149,30 +149,60 @@ func routes(_ app: Application) throws {
     }
 }
 
+// MARK: - Model Registry & Dynamic Detection
+
+public enum ModelRegistry {
+    public static var onDeviceModelId: String {
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let ramBytes = ProcessInfo.processInfo.physicalMemory
+        let ramGB = Double(ramBytes) / (1024.0 * 1024.0 * 1024.0)
+        
+        // iOS 27+ / macOS 27+ with >= 12 GB RAM
+        if osVersion.majorVersion >= 27 && ramGB >= 12.0 {
+            return "apple_foundation_model_3_core_advanced_20b_sparse"
+        } else {
+            return "apple_foundation_model_3_core_3b"
+        }
+    }
+    
+    public static let privateCloudComputeModelId = "apple_intelligence_private_cloud_compute"
+    
+    public static var availableModelIds: [String] {
+        return [
+            onDeviceModelId,
+            privateCloudComputeModelId
+        ]
+    }
+
+    public static func resolveModel(name: String) -> any LanguageModel {
+        if name == privateCloudComputeModelId {
+            return PrivateCloudComputeLanguageModel()
+        }
+        return SystemLanguageModel.default
+    }
+
+    public static func displayName(for modelId: String) -> String {
+        switch modelId {
+        case "apple_foundation_model_3_core_advanced_20b_sparse":
+            return "AFM 3 Core Advanced (20B Sparse)"
+        case "apple_foundation_model_3_core_3b":
+            return "AFM 3 Core (3B)"
+        case "apple_intelligence_private_cloud_compute":
+            return "Private Cloud Compute (PCC)"
+        default:
+            return modelId
+        }
+    }
+}
+
 // MARK: - Routing Helpers
 
 private func getAvailableModelIds() -> [String] {
-    #if canImport(ClaudeForFoundationModels)
-    // Full OS 27+ Model Capabilities (Edge & PCC only)
-    return [
-      "apple_intelligence_on_device",
-      "apple_intelligence_private_cloud"
-    ]
-    #else
-    // OS 26 supports on-device only explicitly
-    return ["apple_intelligence_on_device"]
-    #endif
+    return ModelRegistry.availableModelIds
 }
 
 private func resolveModel(name: String) -> any LanguageModel {
-    #if canImport(ClaudeForFoundationModels)
-    if name == "apple_intelligence_private_cloud" {
-      return PrivateCloudComputeLanguageModel()
-    }
-    return SystemLanguageModel.default
-    #else
-    return SystemLanguageModel.default
-    #endif
+    return ModelRegistry.resolveModel(name: name)
 }
 
 private func mapNativeError(_ error: Error) -> Abort {

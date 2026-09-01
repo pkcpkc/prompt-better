@@ -28,22 +28,22 @@ final class AppTests: XCTestCase {
       XCTAssertEqual(res.status, .ok)
       let models = try res.content.decode(OpenAI.ModelListResponse.self)
       
-      #if canImport(ClaudeForFoundationModels)
       XCTAssertEqual(models.data.count, 2)
-      XCTAssertTrue(models.data.contains { $0.id == "apple_intelligence_on_device" })
-      XCTAssertTrue(models.data.contains { $0.id == "apple_intelligence_private_cloud" })
-      #else
-      // OS 26 target has only the on-device model visible to prevent user confusion
-      XCTAssertEqual(models.data.count, 1)
-      XCTAssertEqual(models.data.first?.id, "apple_intelligence_on_device")
-      #endif
+      XCTAssertTrue(models.data.contains { $0.id == ModelRegistry.onDeviceModelId })
+      XCTAssertTrue(models.data.contains { $0.id == "apple_intelligence_private_cloud_compute" })
+      
+      // Ensure on-device is either 3B or 20B advanced sparse
+      XCTAssertTrue(
+        ModelRegistry.onDeviceModelId == "apple_foundation_model_3_core_3b" ||
+        ModelRegistry.onDeviceModelId == "apple_foundation_model_3_core_advanced_20b_sparse"
+      )
     }
   }
 
   func testChatCompletionWithSpecificModels() async throws {
-    // 1. Verify on-device model completion succeeds
-    let validRequest = OpenAI.ChatCompletionRequest(
-      model: "apple_intelligence_on_device",
+    // 1. Verify on-device detected model completion succeeds
+    let onDeviceRequest = OpenAI.ChatCompletionRequest(
+      model: ModelRegistry.onDeviceModelId,
       messages: [
         .init(role: "user", content: "Say hello")
       ],
@@ -55,18 +55,39 @@ final class AppTests: XCTestCase {
     )
     
     try await app.test(.POST, "v1/chat/completions", beforeRequest: { req in
-      try req.content.encode(validRequest)
+      try req.content.encode(onDeviceRequest)
     }) { res async throws in
       XCTAssertEqual(res.status, .ok)
       let response = try res.content.decode(OpenAI.ChatCompletionResponse.self)
-      XCTAssertEqual(response.model, "apple_intelligence_on_device")
+      XCTAssertEqual(response.model, ModelRegistry.onDeviceModelId)
       XCTAssertFalse(response.choices.isEmpty)
     }
 
-    // 2. Verify that unavailable models (like PCC under OS 26 compilation) are rejected
-    #if !canImport(ClaudeForFoundationModels)
+    // 2. Verify Private Cloud Compute model completion succeeds
+    let pccRequest = OpenAI.ChatCompletionRequest(
+      model: "apple_intelligence_private_cloud_compute",
+      messages: [
+        .init(role: "user", content: "Say hello via PCC")
+      ],
+      temperature: nil,
+      topP: nil,
+      maxTokens: 10,
+      stream: nil,
+      stop: nil
+    )
+    
+    try await app.test(.POST, "v1/chat/completions", beforeRequest: { req in
+      try req.content.encode(pccRequest)
+    }) { res async throws in
+      XCTAssertEqual(res.status, .ok)
+      let response = try res.content.decode(OpenAI.ChatCompletionResponse.self)
+      XCTAssertEqual(response.model, "apple_intelligence_private_cloud_compute")
+      XCTAssertFalse(response.choices.isEmpty)
+    }
+
+    // 3. Verify that unlisted/invalid models are rejected
     let invalidRequest = OpenAI.ChatCompletionRequest(
-      model: "apple_intelligence_private_cloud",
+      model: "unknown_model_identifier",
       messages: [
         .init(role: "user", content: "Say hello")
       ],
@@ -86,6 +107,5 @@ final class AppTests: XCTestCase {
       XCTAssertEqual(errorResponse.error.type, "api_error")
       XCTAssertTrue(errorResponse.error.message.contains("not found"))
     }
-    #endif
   }
 }

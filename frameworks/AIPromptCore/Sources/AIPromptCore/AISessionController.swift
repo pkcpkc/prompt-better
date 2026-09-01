@@ -20,12 +20,12 @@ public final class AISessionController {
     generating type: T.Type,
     createNewSession: Bool = false
   ) async throws -> T {
-    if createNewSession {
+    if createNewSession || self.session == nil {
       let newSession = LanguageModelSession()
       self.session = newSession
     }
     guard let session = self.session else { throw AIError.noActiveSession }
-    let prompt = T.buildSystemPrompt(for: input, context: context)
+    let userPrompt = T.buildSystemPrompt(for: input, context: context)
     do {
       let options =
         T.options
@@ -34,9 +34,14 @@ public final class AISessionController {
           o.sampling = .greedy
           return o
         }()
-      let response = try await session.respond(to: prompt, generating: type, options: options)
+      let response = try await session.respond(to: userPrompt, generating: type, options: options)
       return response.content
-    } catch let error where error.localizedDescription.contains("Safety guardrails") {
+    } catch LanguageModelSession.GenerationError.guardrailViolation {
+      throw AIError.guardrailsTriggered
+    } catch let error where error.localizedDescription.localizedCaseInsensitiveContains("Safety guardrails")
+      || error.localizedDescription.localizedCaseInsensitiveContains("unsafe")
+      || error.localizedDescription.localizedCaseInsensitiveContains("guardrail")
+      || error.localizedDescription.localizedCaseInsensitiveContains("safety") {
       throw AIError.guardrailsTriggered
     }
   }
@@ -50,8 +55,17 @@ public final class AISessionController {
       return o
     }()
     
-    let response = try await session.respond(to: prompt, options: generationOptions)
-    return response.content
+    do {
+      let response = try await session.respond(to: prompt, options: generationOptions)
+      return response.content
+    } catch LanguageModelSession.GenerationError.guardrailViolation {
+      throw AIError.guardrailsTriggered
+    } catch let error where error.localizedDescription.localizedCaseInsensitiveContains("Safety guardrails")
+      || error.localizedDescription.localizedCaseInsensitiveContains("unsafe")
+      || error.localizedDescription.localizedCaseInsensitiveContains("guardrail")
+      || error.localizedDescription.localizedCaseInsensitiveContains("safety") {
+      throw AIError.guardrailsTriggered
+    }
   }
 
   private func ensureSession() async throws -> LanguageModelSession {

@@ -32,23 +32,46 @@ struct ChatWindowView: View {
     @State private var messages: [ChatMessage] = []
     @State private var inputText: String = ""
     @State private var isSending: Bool = false
+    @State private var selectedModel: String = ModelRegistry.onDeviceModelId
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header Row
-            HStack {
-                Text("Model Chat")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                Spacer()
-                Button(action: {
-                    dismiss()
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
+            // Header Row with Title, Model Picker Dropdown, and Close Button
+            VStack(spacing: 10) {
+                HStack {
+                    Text("Model Chat")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                    Spacer()
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                
+                // Dropdown to select model
+                HStack {
+                    Image(systemName: "cpu")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Model:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Picker("Select Model", selection: $selectedModel) {
+                        ForEach(ModelRegistry.availableModelIds, id: \.self) { modelId in
+                            Text(ModelRegistry.displayName(for: modelId)).tag(modelId)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(.primary)
+                    
+                    Spacer()
+                }
             }
             .padding()
             .background(Color.gray.opacity(0.08))
@@ -138,6 +161,7 @@ struct ChatWindowView: View {
         messages.append(userMsg)
         
         isSending = true
+        let targetModel = selectedModel
         Task {
             // Implicitly start server if not running
             if !serverManager.isRunning {
@@ -145,24 +169,25 @@ struct ChatWindowView: View {
             }
             
             // Log the request to make it appear in the dashboard logs
-            serverManager.log("POST /v1/chat/completions (Chat Window)")
+            serverManager.log("POST /v1/chat/completions (Chat Window: \(targetModel))")
             
             do {
-                let session = LanguageModelSession()
+                let resolvedModel = ModelRegistry.resolveModel(name: targetModel)
+                let session = LanguageModelSession(model: resolvedModel)
                 // Combine history for context
                 let historyPrompt = messages.map { ($0.isUser ? "User: " : "Model: ") + $0.text }.joined(separator: "\n\n")
                 
                 let response = try await session.respond(to: historyPrompt)
                 let responseText = response.content
                 
-                serverManager.log("200 POST /v1/chat/completions (Chat Window)")
+                serverManager.log("200 POST /v1/chat/completions (Chat Window: \(targetModel))")
                 
                 await MainActor.run {
                     messages.append(ChatMessage(isUser: false, text: responseText))
                     isSending = false
                 }
             } catch {
-                serverManager.log("500 POST /v1/chat/completions (Chat Window) - Error: \(error.localizedDescription)")
+                serverManager.log("500 POST /v1/chat/completions (Chat Window: \(targetModel)) - Error: \(error.localizedDescription)")
                 await MainActor.run {
                     messages.append(ChatMessage(isUser: false, text: "Error: \(error.localizedDescription)"))
                     isSending = false

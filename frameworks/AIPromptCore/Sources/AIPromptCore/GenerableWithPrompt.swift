@@ -19,13 +19,31 @@ extension GenerableWithPrompt {
     -> String
   {
     var result = systemPrompt
-    if !input.isEmpty {
+    var replacedKeys = Set<String>()
+
+    if !input.isEmpty && result.contains("{{input}}") {
+      result = result.replacingOccurrences(of: "{{input}}", with: input)
+      replacedKeys.insert("input")
+    }
+
+    for (key, value) in context {
+      let placeholder = "{{\(key)}}"
+      if result.contains(placeholder) {
+        result = result.replacingOccurrences(of: placeholder, with: value)
+        replacedKeys.insert(key)
+      }
+    }
+
+    if !input.isEmpty && !replacedKeys.contains("input") {
       result += "\n\nInput:\n\(input)"
     }
+
     for (key, value) in context.sorted(by: { $0.key < $1.key }) {
+      if replacedKeys.contains(key) { continue }
       let titleKey = formatKeyToTitleCase(key)
       result += "\n\n\(titleKey):\n\(value)"
     }
+
     return result
   }
 

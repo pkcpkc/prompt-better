@@ -22,6 +22,15 @@ final class AIPromptCoreTests: XCTestCase {
         public var generatedContent: GeneratedContent { fatalError() }
     }
 
+    public struct MockPromptNoPlaceholders: GenerableWithPrompt {
+        public static var systemPrompt: String { "Summarize text." }
+        public static var options: GenerationOptions? { nil }
+
+        public static var generationSchema: GenerationSchema { fatalError() }
+        public init(_ content: GeneratedContent) throws { }
+        public var generatedContent: GeneratedContent { fatalError() }
+    }
+
     func testBuildSystemPrompt_NoContext() {
         let result = MockPromptNoContext.buildSystemPrompt(for: "sunny days", context: [:])
         XCTAssertEqual(result, "My template is sunny days.", "Should linearly replace input")
@@ -30,6 +39,16 @@ final class AIPromptCoreTests: XCTestCase {
     func testBuildSystemPrompt_WithContext() {
         let result = MockPromptWithContext.buildSystemPrompt(for: "sunny days", context: ["weather": "cold weather"])
         XCTAssertEqual(result, "My template is sunny days and cold weather.", "Should replace all passed keys")
+    }
+
+    func testBuildSystemPrompt_NoPlaceholders() {
+        let result = MockPromptNoPlaceholders.buildSystemPrompt(for: "hello world", context: ["user": "Alice"])
+        XCTAssertEqual(result, "Summarize text.\n\nInput:\nhello world\n\nUser:\nAlice")
+    }
+
+    func testBuildSystemPrompt_ExtraContext() {
+        let result = MockPromptNoContext.buildSystemPrompt(for: "sunny days", context: ["extraInfo": "detailed"])
+        XCTAssertEqual(result, "My template is sunny days.\n\nExtra Info:\ndetailed")
     }
 }
 

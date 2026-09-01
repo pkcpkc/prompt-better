@@ -55,7 +55,7 @@ Both the iOS and macOS bridges implement standard OpenAI-compatible endpoints to
 - **Request Payload**:
   ```json
   {
-    "model": "apple-intelligence",
+    "model": "apple_foundation_model_3_core_3b",
     "messages": [
       {
         "role": "user",
@@ -73,7 +73,7 @@ Both the iOS and macOS bridges implement standard OpenAI-compatible endpoints to
     "id": "chatcmpl-D09D5B48-A971-4DF0-97DF-D9EA19CA8208",
     "object": "chat.completion",
     "created": 1717491600,
-    "model": "apple-intelligence",
+    "model": "apple_foundation_model_3_core_3b",
     "choices": [
       {
         "index": 0,
@@ -97,13 +97,22 @@ Both the iOS and macOS bridges implement standard OpenAI-compatible endpoints to
 
 ### 2. List Models
 - **Route**: `GET /v1/models`
+- **Supported Models**:
+  - On-Device: `apple_foundation_model_3_core_3b` (or `apple_foundation_model_3_core_advanced_20b_sparse` when running on OS 27+ with $\ge 12\text{ GB}$ RAM).
+  - Private Cloud Compute: `apple_intelligence_private_cloud_compute`.
 - **Response**:
   ```json
   {
     "object": "list",
     "data": [
       {
-        "id": "apple-intelligence",
+        "id": "apple_foundation_model_3_core_3b",
+        "object": "model",
+        "created": 1717491600,
+        "owned_by": "apple"
+      },
+      {
+        "id": "apple_intelligence_private_cloud_compute",
         "object": "model",
         "created": 1717491600,
         "owned_by": "apple"
@@ -175,7 +184,17 @@ To direct the Python client/optimizer to target your local bridge, configure the
 {
   "student": {
     "base_url": "http://127.0.0.1:8080/v1",
-    "model": "apple-intelligence"
+    "model": "apple_foundation_model_3_core_3b"
+  }
+}
+```
+
+Or for Private Cloud Compute:
+```json
+{
+  "student": {
+    "base_url": "http://127.0.0.1:8080/v1",
+    "model": "apple_intelligence_private_cloud_compute"
   }
 }
 ```
@@ -183,7 +202,7 @@ To direct the Python client/optimizer to target your local bridge, configure the
 Or via environment variables:
 ```bash
 export PROMPT_BETTER_STUDENT_BASE_URL="http://127.0.0.1:8080/v1"
-export PROMPT_BETTER_STUDENT_MODEL="apple-intelligence"
+export PROMPT_BETTER_STUDENT_MODEL="apple_foundation_model_3_core_3b"
 ```
 
 > [!TIP]

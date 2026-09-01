@@ -1,8 +1,7 @@
-from __future__ import annotations
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from prompt_better.dspy_manager import BaseOptimizer, DefaultOptimizer, load_optimizer
 
@@ -12,11 +11,11 @@ class DummyCustomOptimizer(BaseOptimizer):
         self,
         config: Any,
         spec: Any,
-        specs: Dict[str, Any],
+        specs: dict[str, Any],
         student_lm: Any,
         teacher_lm: Any,
-        trainset: List[Any],
-        evalset: List[Any],
+        trainset: list[Any],
+        evalset: list[Any],
         metric: Any,
         module: Any,
     ) -> Any:
@@ -31,9 +30,16 @@ class OptimizerTests(unittest.TestCase):
     def test_load_optimizer_builtin_modes(self) -> None:
         optimizer_predict = load_optimizer("predict")
         self.assertIsInstance(optimizer_predict, DefaultOptimizer)
-        
+
         optimizer_cot = load_optimizer("chain-of-thought")
         self.assertIsInstance(optimizer_cot, DefaultOptimizer)
+
+        optimizer_mipro = load_optimizer("miprov2")
+        self.assertIsInstance(optimizer_mipro, DefaultOptimizer)
+
+        optimizer_gepa = load_optimizer("gepa")
+        from prompt_better.dspy_manager import GepaOptimizer
+        self.assertIsInstance(optimizer_gepa, GepaOptimizer)
 
 
     def test_load_optimizer_dotted_path(self) -> None:
@@ -71,8 +77,10 @@ class OptimizerTests(unittest.TestCase):
             self.assertEqual(optimizer.compile(None, None, {}, None, None, [], [], None, None), "autoFileOptCompiled")
 
     def test_wrap_module_deepcopy_compatibility(self) -> None:
-        import dspy
         import copy
+
+        import dspy
+
         from prompt_better.dspy_manager.optimizer import _wrap_module_to_handle_errors
 
         # Create a signature and Predict module
@@ -96,9 +104,9 @@ class OptimizerTests(unittest.TestCase):
         class DummyLM(dspy.LM):
             def __init__(self) -> None:
                 super().__init__("openai/gpt-4o-mini")
-                self.calls: List[Any] = []
+                self.calls: list[Any] = []
 
-            def __call__(self, *args: Any, **kwargs: Any) -> List[str]:
+            def __call__(self, *args: Any, **kwargs: Any) -> list[str]:
                 self.calls.append((args, kwargs))
                 return ['{"answer": "mocked"}']
 
@@ -121,6 +129,61 @@ class OptimizerTests(unittest.TestCase):
             m["content"] for m in dummy_lm.calls[-1][1].get("messages", []) if m["role"] == "system"
         )
         self.assertIn("Updated Instructions", system_content_copied)
+
+    def test_gepa_optimizer_compile(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from prompt_better.dspy_manager import EndpointConfig, GepaOptimizer, OptimizationConfig
+        from prompt_better.prompt_json import InstructionsSpec, PromptFieldSpec, PromptSpec
+
+        spec = PromptSpec(
+            name="TestPrompt",
+            instructions=InstructionsSpec(
+                prompt="test instructions",
+                context=[
+                    PromptFieldSpec(name="input_text", role="input", type="string", desc="Input text"),
+                ],
+            ),
+            outputs=[
+                PromptFieldSpec(name="output_text", role="output", type="string", desc="Output text"),
+            ],
+        )
+        config = OptimizationConfig(
+            student=EndpointConfig(base_url="http://localhost:8080/v1", model="test-student", api_key="test"),
+            teacher=EndpointConfig(base_url="http://localhost:8000/v1", model="test-teacher", api_key="test"),
+            prompts_dir=Path("/tmp/prompts"),
+            dataset_file=Path("/tmp/dataset.json"),
+            prompt_name="TestPrompt",
+            auto_mode="light",
+            num_threads=2,
+            num_trials=10,
+        )
+
+        with patch("dspy.GEPA") as mock_gepa_cls:
+            mock_gepa_instance = MagicMock()
+            mock_gepa_instance.compile.return_value = "gepaCompiledModule"
+            mock_gepa_cls.return_value = mock_gepa_instance
+
+            optimizer = GepaOptimizer()
+            res = optimizer.compile(
+                config=config,
+                spec=spec,
+                specs={"TestPrompt": spec},
+                student_lm=MagicMock(),
+                teacher_lm=MagicMock(),
+                trainset=[],
+                evalset=[],
+                metric=lambda *args: 1.0,
+                module=MagicMock(),
+            )
+
+            self.assertEqual(res, "gepaCompiledModule")
+            mock_gepa_cls.assert_called_once()
+            call_kwargs = mock_gepa_cls.call_args[1]
+            self.assertEqual(call_kwargs["auto"], "light")
+            self.assertEqual(call_kwargs["num_threads"], 2)
+            self.assertEqual(call_kwargs["max_metric_calls"], 10)
+            mock_gepa_instance.compile.assert_called_once()
 
 
 if __name__ == "__main__":

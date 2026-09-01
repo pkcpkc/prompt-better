@@ -72,7 +72,7 @@ The framework resolves configurations hierarchically: CLI arguments > Environmen
    {
      "student": {
        "base_url": "http://127.0.0.1:8080/v1",
-       "model": "apple-intelligence",
+       "model": "apple_foundation_model_3_core_3b",
        "temperature": 0.2
      },
      "teacher": {
@@ -292,9 +292,20 @@ flowchart TD
     OverwriteSource --> End
 ```
 
-### Custom Optimizer Implementations
+### Built-in & Custom Optimizer Options
 
-By default, prompt optimization uses the DSPy `MIPROv2` compiler. You can customize the optimization and compilation process by providing your own optimizer subclassing `BaseOptimizer`:
+`prompt-better` supports several optimizer and compiler configurations:
+
+| Optimizer Mode / Value | Description | iOS / On-Device Suitability |
+| :--- | :--- | :--- |
+| `"predict"` | Uses `dspy.Predict` with `MIPROv2` compiler. | **Best Suited for iOS**: Compiles prompt instructions without conversational chain-of-thought text headers (`Reasoning:`), conforming seamlessly to Apple's native schema-guided structured outputs. |
+| `"chain-of-thought"` / `"miprov2"` (default) | Uses `dspy.ChainOfThought` with `MIPROv2` multi-prompt instruction & few-shot bootstrap proposal. | Great for general LLMs, but requires explicitly modeling a `reasoning` field in `outputs` if targeting Swift schema-guided sessions. |
+| `"gepa"` | Uses DSPy v3's reflective optimizer (`dspy.GEPA` - Genetic Evolutionary Prompt Adaptation) via reflection LM. | Excellent for complex multi-objective tasks with detailed teacher evaluation rubrics. |
+| Custom subclass of `BaseOptimizer` | Custom compile logic subclassing `BaseOptimizer`. | Flexible for specialized on-device fine-tuning or custom search strategies. |
+
+#### Custom Optimizer Implementations
+
+You can customize the optimization and compilation process by providing your own optimizer subclassing `BaseOptimizer`:
 
 ```python
 from prompt_better.dspy_manager import BaseOptimizer
@@ -317,16 +328,16 @@ class CustomOptimizer(BaseOptimizer):
         return compiled_module
 ```
 
-#### Setting the Custom Optimizer
+#### Setting the Optimizer
 
-You can configure the custom optimizer dynamically in three ways (resolved hierarchically):
+You can configure the optimizer dynamically in three ways (resolved hierarchically):
 
-1. **CLI Flag**: Specify `--optimizer path.to.module:CustomOptimizer` or file path `path/to/script.py:CustomOptimizer` (or simply `path/to/script.py` which auto-detects the subclass).
-2. **Environment Variable**: `export PROMPT_BETTER_OPTIMIZER="path.to.module:CustomOptimizer"`
+1. **CLI Flag**: Specify `--optimizer predict`, `--optimizer gepa`, or `--optimizer path.to.module:CustomOptimizer` / `path/to/script.py:CustomOptimizer` (or simply `path/to/script.py` which auto-detects the subclass).
+2. **Environment Variable**: `export PROMPT_BETTER_OPTIMIZER="predict"` (or `"gepa"`, `"miprov2"`, custom class path).
 3. **Global Config (`prompt-better.json`)**:
    ```json
    {
-     "optimizer": "path.to.module:CustomOptimizer"
+     "optimizer": "predict"
    }
    ```
 
@@ -561,7 +572,7 @@ Defines expected ground truth values and human-written grading rubrics.
 ### Environment Variables
 
 - `PROMPT_BETTER_STUDENT_BASE_URL`: API root for student completions (e.g. Vapor server: `http://localhost:8080/v1`).
-- `PROMPT_BETTER_STUDENT_MODEL`: Model ID identifier (e.g. `apple-intelligence`).
+- `PROMPT_BETTER_STUDENT_MODEL`: Model ID identifier (e.g. `apple_foundation_model_3_core_3b` or `apple_intelligence_private_cloud_compute`).
 - `PROMPT_BETTER_STUDENT_API_KEY`: Key used for authentication (optional/blank for localhost).
 - `PROMPT_BETTER_STUDENT_TEMPERATURE`: Default temperature for student model completion calls (defaults to `0.2`).
 - `PROMPT_BETTER_TEACHER_BASE_URL`: API root for the cloud teacher model (e.g. `https://api.openai.com/v1`).
@@ -569,7 +580,7 @@ Defines expected ground truth values and human-written grading rubrics.
 - `PROMPT_BETTER_TEACHER_API_KEY`: API token authorization key.
 - `PROMPT_BETTER_TEACHER_TEMPERATURE`: General/MIPRO temperature for the teacher model when proposing prompt variations and creating samples (defaults to `0.2`).
 - `PROMPT_BETTER_TEACHER_EVAL_TEMPERATURE`: Evaluation/eval temperature for the teacher model when grading/evaluating candidate outputs (defaults to `0.0` as recommended).
-- `PROMPT_BETTER_OPTIMIZER`: Import path or file path to custom Optimizer class, or built-in modes: `"chain-of-thought"` (default) or `"predict"`.
+- `PROMPT_BETTER_OPTIMIZER`: Optimizer mode or custom class path: `"predict"` (best suited for iOS/schema-guided structured output), `"chain-of-thought"` / `"miprov2"` (default), `"gepa"` (DSPy v3 reflective optimization), or custom class/file path.
 
 ### Scenario-Specific CLI Presets
 
