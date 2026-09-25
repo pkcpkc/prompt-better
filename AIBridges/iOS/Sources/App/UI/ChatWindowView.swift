@@ -32,7 +32,7 @@ struct ChatWindowView: View {
     @State private var messages: [ChatMessage] = []
     @State private var inputText: String = ""
     @State private var isSending: Bool = false
-    @State private var selectedModel: String = ModelRegistry.onDeviceModelId
+    @State private var selectedModel: String = ModelRegistry.defaultModelId
     
     var body: some View {
         VStack(spacing: 0) {
@@ -148,6 +148,10 @@ struct ChatWindowView: View {
         }
         .frame(minWidth: 350, minHeight: 450)
         .onDisappear {
+            messages.removeAll()
+        }
+        .onChange(of: selectedModel) { _, _ in
+            // Switching models starts a fresh conversation
             messages.removeAll()
         }
     }

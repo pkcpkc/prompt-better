@@ -99,6 +99,9 @@ class ServerManager: ObservableObject {
       
       self.isRunning = true
       log("Server is running.")
+      log(ModelRegistry.systemModelDiagnostics)
+
+      await logAvailableModels()
 
     } catch {
       log("Failed to start server: \(error)")
@@ -107,6 +110,21 @@ class ServerManager: ObservableObject {
 
   func log(_ message: String) {
     logsManager.log(message)
+  }
+
+  /// Fetches the model list through the running server's own API and logs each model.
+  private func logAvailableModels() async {
+    guard let url = URL(string: "http://\(ipAddress):\(String(port))/v1/models") else { return }
+    do {
+      let (data, _) = try await URLSession.shared.data(from: url)
+      let models = try JSONDecoder().decode(OpenAI.ModelListResponse.self, from: data).data
+      log("Available models (\(models.count)):")
+      for model in models {
+        log("  • \(ModelRegistry.displayName(for: model.id)) [\(model.id)]")
+      }
+    } catch {
+      log("Failed to fetch models: \(error.localizedDescription)")
+    }
   }
 
   func stop() async {

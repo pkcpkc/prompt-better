@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		18BF17FAB72643F4FA692121 /* ChatWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 477221B79AE4ABC47A2C2569 /* ChatWindowView.swift */; };
 		2A110DAE8EC509F18EEDD03C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DE4A7A20FC4E10719A2E211 /* ContentView.swift */; };
+		2EAE3237C984D231FB485310 /* OpenAI+Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BFF7B6735EFBD85CD91982 /* OpenAI+Error.swift */; };
 		2F42F7A88D6A717E00E7A4F4 /* OpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F58DCB68B7B0CA4245EC1F1 /* OpenAI.swift */; };
 		3907A718ECDAA0565E34101D /* OpenAI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F58DCB68B7B0CA4245EC1F1 /* OpenAI.swift */; };
 		39C2EE38550497D488F9F155 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7AE3ABA129928302E475C584 /* Assets.xcassets */; };
@@ -16,6 +17,7 @@
 		3CAB822432F7520C1A346DCA /* iOSAIBridgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F3F42A36EE93043DC187FD /* iOSAIBridgeApp.swift */; };
 		4D455FF5938E984829293294 /* AIPromptCore in Embed Frameworks */ = {isa = PBXBuildFile; productRef = AB5D6391BF733FD637DF53E1 /* AIPromptCore */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		6817088A45BEE7F871567C41 /* AIPromptCore in Frameworks */ = {isa = PBXBuildFile; productRef = AB5D6391BF733FD637DF53E1 /* AIPromptCore */; };
+		6A596304395C772969B8F24B /* OpenAI+Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9BFF7B6735EFBD85CD91982 /* OpenAI+Error.swift */; };
 		778AEB993ECCC9A7E47D2C0C /* LaunchScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2301FE42303E969E591421 /* LaunchScreenView.swift */; };
 		7B7742CF68B5710CB11BE252 /* AIPromptCore in Frameworks */ = {isa = PBXBuildFile; productRef = 6AA28B7CC766DC66365C650C /* AIPromptCore */; };
 		993CF579B2393835F5C5B348 /* Routes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56E29223531F297B6D1A3B53 /* Routes.swift */; };
@@ -66,6 +68,7 @@
 		82E13A891DBCD3EB2653FB83 /* AIPromptCore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AIPromptCore; path = ../../frameworks/AIPromptCore; sourceTree = SOURCE_ROOT; };
 		89F3F42A36EE93043DC187FD /* iOSAIBridgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iOSAIBridgeApp.swift; sourceTree = "<group>"; };
 		CAD62F2A59701A33D597D493 /* macAIBridge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = macAIBridge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F9BFF7B6735EFBD85CD91982 /* OpenAI+Error.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "OpenAI+Error.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +147,7 @@
 			isa = PBXGroup;
 			children = (
 				3F58DCB68B7B0CA4245EC1F1 /* OpenAI.swift */,
+				F9BFF7B6735EFBD85CD91982 /* OpenAI+Error.swift */,
 			);
 			path = DTO;
 			sourceTree = "<group>";
@@ -263,6 +267,7 @@
 				18BF17FAB72643F4FA692121 /* ChatWindowView.swift in Sources */,
 				FD65D42D3CD1816DAF1B2197 /* ContentView.swift in Sources */,
 				778AEB993ECCC9A7E47D2C0C /* LaunchScreenView.swift in Sources */,
+				2EAE3237C984D231FB485310 /* OpenAI+Error.swift in Sources */,
 				3907A718ECDAA0565E34101D /* OpenAI.swift in Sources */,
 				B2C39C8BD18A1003A9D64991 /* Routes.swift in Sources */,
 				3B306E20A384F35AE11ADE36 /* iOSAIBridgeApp.swift in Sources */,
@@ -276,6 +281,7 @@
 				E921481F1C998F2127A914A1 /* ChatWindowView.swift in Sources */,
 				2A110DAE8EC509F18EEDD03C /* ContentView.swift in Sources */,
 				FA3998AE27AA18A1ED613216 /* LaunchScreenView.swift in Sources */,
+				6A596304395C772969B8F24B /* OpenAI+Error.swift in Sources */,
 				2F42F7A88D6A717E00E7A4F4 /* OpenAI.swift in Sources */,
 				993CF579B2393835F5C5B348 /* Routes.swift in Sources */,
 				3CAB822432F7520C1A346DCA /* iOSAIBridgeApp.swift in Sources */,

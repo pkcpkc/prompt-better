@@ -29,23 +29,17 @@ final class AppTests: XCTestCase {
       let models = try res.content.decode(OpenAI.ModelListResponse.self)
       
       XCTAssertEqual(models.data.count, 2)
-      XCTAssertTrue(models.data.contains { $0.id == ModelRegistry.onDeviceModelId })
+      XCTAssertTrue(models.data.contains { $0.id == ModelName.defaultModel.rawValue })
       XCTAssertTrue(models.data.contains { $0.id == ModelName.privateCloudCompute.rawValue })
-      
-      // Ensure on-device is either 3B or 20B advanced sparse
-      XCTAssertTrue(
-        ModelRegistry.onDeviceModelId == ModelName.afm3Core3B.rawValue ||
-        ModelRegistry.onDeviceModelId == ModelName.afm3CoreAdvanced20BSparse.rawValue
-      )
     }
   }
 
   func testChatCompletionWithSpecificModels() async throws {
-    // 1. Verify on-device detected model completion succeeds
-    let onDeviceRequest = OpenAI.ChatCompletionRequest(
-      model: ModelRegistry.onDeviceModelId,
+    // 1. Verify default model completion succeeds
+    let defaultRequest = OpenAI.ChatCompletionRequest(
+      model: ModelName.defaultModel.rawValue,
       messages: [
-        .init(role: "user", content: "Say hello")
+        .init(role: "user", content: "Say hello via default")
       ],
       temperature: nil,
       topP: nil,
@@ -55,11 +49,11 @@ final class AppTests: XCTestCase {
     )
     
     try await app.test(.POST, "v1/chat/completions", beforeRequest: { req in
-      try req.content.encode(onDeviceRequest)
+      try req.content.encode(defaultRequest)
     }) { res async throws in
       XCTAssertEqual(res.status, .ok)
       let response = try res.content.decode(OpenAI.ChatCompletionResponse.self)
-      XCTAssertEqual(response.model, ModelRegistry.onDeviceModelId)
+      XCTAssertEqual(response.model, ModelName.defaultModel.rawValue)
       XCTAssertFalse(response.choices.isEmpty)
     }
 
@@ -85,7 +79,30 @@ final class AppTests: XCTestCase {
       XCTAssertFalse(response.choices.isEmpty)
     }
 
-    // 3. Verify that unlisted/invalid models are rejected
+    // 3. Verify that unlisted/legacy models are rejected
+    let legacyRequest = OpenAI.ChatCompletionRequest(
+      model: "apple-foundation-model-3-core-3b",
+      messages: [
+        .init(role: "user", content: "Say hello")
+      ],
+      temperature: nil,
+      topP: nil,
+      maxTokens: 10,
+      stream: nil,
+      stop: nil
+    )
+    
+    try await app.test(.POST, "v1/chat/completions", beforeRequest: { req in
+      try req.content.encode(legacyRequest)
+    }) { res async throws in
+      XCTAssertEqual(res.status, .notFound)
+      let errorResponse = try res.content.decode(OpenAI.ErrorResponse.self)
+      XCTAssertEqual(errorResponse.error.code, "api_error")
+      XCTAssertEqual(errorResponse.error.type, "api_error")
+      XCTAssertTrue(errorResponse.error.message.contains("not found"))
+    }
+
+    // 4. Verify that unknown models are rejected
     let invalidRequest = OpenAI.ChatCompletionRequest(
       model: "unknown_model_identifier",
       messages: [

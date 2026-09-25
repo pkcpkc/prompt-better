@@ -23,20 +23,17 @@ extension LanguageModelSession {
 // MARK: - Model Names & Registry
 
 public enum ModelName: String, CaseIterable, Sendable {
-    case afm3Core3B = "apple-foundation-model-3-core-3b"
-    case afm3CoreAdvanced20BSparse = "apple-foundation-model-3-core-advanced-20b-sparse"
+    case defaultModel = "default"
     case privateCloudCompute = "apple-intelligence-private-cloud-compute"
 
     public var id: String { rawValue }
 
     public var displayName: String {
         switch self {
-        case .afm3Core3B:
-            return "AFM 3 Core (3B)"
-        case .afm3CoreAdvanced20BSparse:
-            return "AFM 3 Core Advanced (20B Sparse)"
+        case .defaultModel:
+            return "System Default: \(ModelRegistry.systemDefaultConcreteName)"
         case .privateCloudCompute:
-            return "Private Cloud Compute (PCC)"
+            return "Apple Intelligence Private Cloud Compute (PCC)"
         }
     }
 }
@@ -44,29 +41,40 @@ public enum ModelName: String, CaseIterable, Sendable {
 public enum ModelRegistry: Sendable {
     public typealias Model = ModelName
 
-    public static var onDeviceModel: ModelName {
-        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
-        let ramBytes = ProcessInfo.processInfo.physicalMemory
-        let ramGB = Double(ramBytes) / (1024.0 * 1024.0 * 1024.0)
-        
-        // iOS 27+ / macOS 27+ with >= 12 GB RAM
-        if osVersion.majorVersion >= 27 && ramGB >= 12.0 {
-            return .afm3CoreAdvanced20BSparse
-        } else {
-            return .afm3Core3B
+    public static let defaultModel: ModelName = .defaultModel
+    public static let defaultModelId: String = ModelName.defaultModel.rawValue
+    
+    /// Concrete on-device model backing `SystemLanguageModel.default`, as reported by the system.
+    /// On OS 27+ this is `SystemLanguageModel.variant` (`.core3` or `.coreAdvanced3`).
+    public static var systemDefaultConcreteName: String {
+        if #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) {
+            return SystemLanguageModel.default.variant.displayName
         }
+        return "Apple On-Device Foundation Model (3B)"
     }
-    
-    public static var onDeviceModelId: String {
-        onDeviceModel.rawValue
+
+    /// One-line description of the active system model for startup logging.
+    public static var systemModelDiagnostics: String {
+        let model = SystemLanguageModel.default
+        var parts = ["System model: \(systemDefaultConcreteName)"]
+        if #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) {
+            switch model.variant {
+            case .coreAdvanced3: parts.append("variant: coreAdvanced3")
+            case .core3: parts.append("variant: core3")
+            default: parts.append("variant: unknown")
+            }
+        }
+        parts.append("context: \(model.contextSize) tokens")
+        parts.append("availability: \(model.availability)")
+        return parts.joined(separator: ", ")
     }
-    
+
     public static let privateCloudComputeModel: ModelName = .privateCloudCompute
     public static let privateCloudComputeModelId: String = ModelName.privateCloudCompute.rawValue
     
     public static var availableModels: [ModelName] {
         [
-            onDeviceModel,
+            defaultModel,
             privateCloudComputeModel
         ]
     }
@@ -75,8 +83,14 @@ public enum ModelRegistry: Sendable {
         availableModels.map(\.rawValue)
     }
 
+    public static func isSupported(modelId: String) -> Bool {
+        let normalized = modelId.hasPrefix("openai/") ? String(modelId.dropFirst("openai/".count)) : modelId
+        return availableModelIds.contains(normalized)
+    }
+
     public static func resolveModel(name: String) -> any LanguageModel {
-        guard let model = ModelName(rawValue: name) else {
+        let normalized = name.hasPrefix("openai/") ? String(name.dropFirst("openai/".count)) : name
+        guard let model = ModelName(rawValue: normalized) else {
             return SystemLanguageModel.default
         }
         return resolveModel(model: model)
@@ -86,13 +100,14 @@ public enum ModelRegistry: Sendable {
         switch model {
         case .privateCloudCompute:
             return PrivateCloudComputeLanguageModel()
-        case .afm3Core3B, .afm3CoreAdvanced20BSparse:
+        case .defaultModel:
             return SystemLanguageModel.default
         }
     }
 
     public static func displayName(for modelId: String) -> String {
-        ModelName(rawValue: modelId)?.displayName ?? modelId
+        let normalized = modelId.hasPrefix("openai/") ? String(modelId.dropFirst("openai/".count)) : modelId
+        return ModelName(rawValue: normalized)?.displayName ?? modelId
     }
 }
 
@@ -107,7 +122,7 @@ final class LocalAIBridge {
     let modelName = request.model
     
     // Check if the requested model is allowed on the current compiled system version
-    guard getAvailableModelIds().contains(modelName) else {
+    guard ModelRegistry.isSupported(modelId: modelName) else {
       throw Abort(.notFound, reason: "Model '\(modelName)' not found.")
     }
 

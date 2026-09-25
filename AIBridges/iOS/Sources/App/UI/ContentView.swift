@@ -135,9 +135,18 @@ struct LogsView: View {
 
   var body: some View {
     VStack(alignment: .leading) {
-      Text("Logs")
-        .font(.headline)
-        .padding(.horizontal)
+      HStack {
+        Text("Logs")
+          .font(.headline)
+        Spacer()
+        Button(action: copyAllLogs) {
+          Label("Copy All", systemImage: "doc.on.doc")
+            .font(.caption)
+        }
+        .buttonStyle(.borderless)
+        .disabled(logsManager.logs.isEmpty)
+      }
+      .padding(.horizontal)
 
       ScrollViewReader { proxy in
         ScrollView {
@@ -149,6 +158,8 @@ struct LogsView: View {
                 .id(log.id)
             }
           }
+          // Read-only: log lines can be selected and copied, never edited or pasted into
+          .textSelection(.enabled)
         }
         .onChange(of: logsManager.logs) { oldValue, newValue in
           if let last = newValue.last {
@@ -164,5 +175,15 @@ struct LogsView: View {
       .cornerRadius(8)
       .padding(.horizontal)
     }
+  }
+
+  private func copyAllLogs() {
+    let text = logsManager.logs.map(\.text).joined(separator: "\n")
+    #if os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+    #else
+    UIPasteboard.general.string = text
+    #endif
   }
 }

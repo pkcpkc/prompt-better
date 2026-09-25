@@ -7,6 +7,8 @@ public func configure(_ app: Application) async throws {
         app.http.server.configuration.port = 8080
     }
     
+    app.logger.info("\(ModelRegistry.systemModelDiagnostics)")
+
     // Register routes
     try routes(app)
 }
