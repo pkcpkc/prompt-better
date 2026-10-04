@@ -23,29 +23,41 @@ Or in Xcode:
 ---
 
 ### Option B: Universal XCFramework (`AIPromptCore.xcframework`)
-To build the distributable, closed-source or binary framework for iOS Device, iOS Simulator, and macOS:
+To build the distributable universal `XCFramework` for iOS Device, iOS Simulator, and macOS:
 
 ```bash
 cd frameworks/AIPromptCore
+
+# Default build (WITHOUT Speech.framework - prevents App Store permission prompts & conflicts):
 ./build_xcframework.sh
+
+# Optional build with Speech-to-Text (STT) support:
+./build_xcframework.sh --with-speech
 ```
 
 The resulting `build/AIPromptCore.xcframework` contains:
 - `ios-arm64` (iOS physical devices)
 - `ios-arm64_x86_64-simulator` (iOS Simulators)
-- `macos-arm64` (macOS Apple Silicon)
+- `macos-arm64_x86_64` (macOS Apple Silicon & Intel)
 
 Drag `AIPromptCore.xcframework` into your Xcode project's **Frameworks, Libraries, and Embedded Content** and set to **Embed & Sign**.
 
 ---
 
-## 2. Privacy & Entitlements (`Info.plist`)
+## 2. Speech Feature Flag & Privacy Entitlements
 
-If your app uses speech recognition or microphone features via `client.audio`:
+By default, `AIPromptCore` compiles **without** speech recognition (`Speech.framework`), avoiding any linker conflicts or App Store review rejections (`ITMS-90683: Missing Purpose String in Info.plist`) for applications that only require LLMs, prompts, embeddings, OCR, or local search.
+
+To enable Speech-to-Text (`SpeechRecognitionService`):
+- **When building XCFramework**: run `./build_xcframework.sh --with-speech` (or `WITH_SPEECH=1 ./build_xcframework.sh`).
+- **When building via Swift Package Manager**: pass `ENABLE_SPEECH=1` in the environment, or pass `-Xswiftc -DENABLE_SPEECH` to `swift build` / Xcode build settings.
+
+If your app builds with speech recognition enabled (`--with-speech` / `ENABLE_SPEECH=1`) and uses audio transcription:
+Add the following keys to your application target's `Info.plist`:
 
 ```xml
 <key>NSSpeechRecognitionUsageDescription</key>
-<string>This app uses on-device speech recognition to transcribe your voice notes privately.</string>
+<string>This app uses on-device speech recognition to transcribe voice recordings privately.</string>
 <key>NSMicrophoneUsageDescription</key>
 <string>This app requires microphone access to record audio for transcription.</string>
 ```

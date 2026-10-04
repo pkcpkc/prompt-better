@@ -623,9 +623,10 @@ See [AIPromptCore Framework](frameworks/AIPromptCore) for details.
 > [!NOTE]
 > Using the `AIPromptCore` framework is recommended to ensure exactly the same execution interface (parameters, parsing, and call structures) to the Apple foundational model as used during optimization. However, it is not strictly required; you can extract the optimized instruction text from the results JSON files and run them in any custom LLM setup.
 
-1.  Compile Swift targets to framework binaries:
+1.  Compile Swift targets to framework binaries (built without speech libs per default; use `--with-speech` for speech support):
     ```bash
     cd frameworks/AIPromptCore && ./build_xcframework.sh
+    # Or to include speech libs (STT): ./build_xcframework.sh --with-speech
     ```
 2.  Link the binary or package reference into your application project (`Package.swift`):
     ```swift
