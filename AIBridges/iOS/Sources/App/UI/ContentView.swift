@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
   @EnvironmentObject var serverManager: ServerManager
   @State private var showChat = false
+  @State private var showSettings = false
 
   var body: some View {
     NavigationStack {
@@ -14,6 +15,16 @@ struct ContentView: View {
                 .fontWeight(.bold)
             
             Spacer()
+            
+            Button(action: {
+                showSettings = true
+            }) {
+                Image(systemName: "gearshape.fill")
+                    .imageScale(.large)
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 8)
             
             Button(action: {
                 if serverManager.isRunning {
@@ -92,6 +103,16 @@ struct ContentView: View {
       .sheet(isPresented: $showChat) {
         ChatWindowView()
           .environmentObject(serverManager)
+      }
+      .sheet(isPresented: $showSettings) {
+        NavigationStack {
+          SettingsView()
+            .toolbar {
+              ToolbarItem(placement: .cancellationAction) {
+                Button("Done") { showSettings = false }
+              }
+            }
+        }
       }
     }
   }

@@ -1,5 +1,21 @@
 // swift-tools-version:6.0
 import PackageDescription
+import Foundation
+
+let enableSpeech = ProcessInfo.processInfo.environment["ENABLE_SPEECH"] == "1" ||
+                   ProcessInfo.processInfo.environment["WITH_SPEECH"] == "1" ||
+                   ProcessInfo.processInfo.environment["AIPROMPT_ENABLE_SPEECH"] == "1" ||
+                   ProcessInfo.processInfo.arguments.contains("--enable-speech") ||
+                   ProcessInfo.processInfo.arguments.contains("--with-speech")
+
+var swiftSettings: [SwiftSetting] = [
+    // Enable [@MainActor] for better alignment with local AI frameworks
+    .unsafeFlags(["-Xfrontend", "-warn-concurrency", "-Xfrontend", "-enable-actor-data-race-checks"])
+]
+
+if enableSpeech {
+    swiftSettings.append(.define("ENABLE_SPEECH"))
+}
 
 let package = Package(
     name: "iosAIBridge",
@@ -22,9 +38,7 @@ let package = Package(
                 .product(name: "AIPromptCore", package: "AIPromptCore")
             ],
             path: "Sources/App",
-            swiftSettings: [
-                .unsafeFlags(["-Xfrontend", "-warn-concurrency", "-Xfrontend", "-enable-actor-data-race-checks"])
-            ]
+            swiftSettings: swiftSettings
         )
     ]
 )

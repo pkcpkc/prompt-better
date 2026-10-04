@@ -2,6 +2,23 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
+import Foundation
+
+// Check whether speech support should be enabled (default: false / without speech)
+let enableSpeech = ProcessInfo.processInfo.environment["ENABLE_SPEECH"] == "1" ||
+                   ProcessInfo.processInfo.environment["WITH_SPEECH"] == "1" ||
+                   ProcessInfo.processInfo.environment["AIPROMPT_ENABLE_SPEECH"] == "1" ||
+                   ProcessInfo.processInfo.arguments.contains("--enable-speech") ||
+                   ProcessInfo.processInfo.arguments.contains("--with-speech")
+
+var swiftSettings: [SwiftSetting] = [
+    // Enable [@MainActor] for better alignment with local AI frameworks
+    .unsafeFlags(["-Xfrontend", "-warn-concurrency", "-Xfrontend", "-enable-actor-data-race-checks"])
+]
+
+if enableSpeech {
+    swiftSettings.append(.define("ENABLE_SPEECH"))
+}
 
 let package = Package(
     name: "AIPromptCore",
@@ -26,15 +43,13 @@ let package = Package(
             name: "AIPromptCore",
             dependencies: [],
             path: "Sources/AIPromptCore",
-            swiftSettings: [
-                // Enable [@MainActor] for better alignment with local AI frameworks
-                .unsafeFlags(["-Xfrontend", "-warn-concurrency", "-Xfrontend", "-enable-actor-data-race-checks"])
-            ]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "AIPromptCoreTests",
             dependencies: ["AIPromptCore"],
-            path: "Tests/AIPromptCoreTests"
+            path: "Tests/AIPromptCoreTests",
+            swiftSettings: swiftSettings
         )
     ]
 )

@@ -2,24 +2,6 @@ import Vapor
 import AIPromptCore
 import FoundationModels
 
-// MARK: - Compatibility Mocks for compilation in OS 26 (Sequoia/macOS 15) environment
-#if !canImport(ClaudeForFoundationModels)
-public protocol LanguageModel: Sendable {}
-
-extension SystemLanguageModel: LanguageModel {}
-
-public struct PrivateCloudComputeLanguageModel: LanguageModel {
-    public init() {}
-}
-
-extension LanguageModelSession {
-    public convenience init(model: any LanguageModel, instructions: String? = nil) {
-        let systemModel = (model as? SystemLanguageModel) ?? SystemLanguageModel.default
-        self.init(model: systemModel, tools: [], instructions: instructions)
-    }
-}
-#endif
-
 func routes(_ app: Application) throws {
     
     // MARK: - OpenAI Compatibility
@@ -27,10 +9,9 @@ func routes(_ app: Application) throws {
     // Route: POST /v1/chat/completions
     app.post("v1", "chat", "completions") { req async throws in
         let completionRequest = try req.content.decode(OpenAI.ChatCompletionRequest.self)
-        
         let modelName = completionRequest.model
+        
         guard ModelRegistry.isSupported(modelId: modelName) else {
-            // Formulate standard OpenAI not found error
             let errorDetail = OpenAI.ErrorResponse.ErrorDetail(
                 message: "Model '\(modelName)' not found.",
                 type: "invalid_request_error",
@@ -42,84 +23,41 @@ func routes(_ app: Application) throws {
             return Response(status: .notFound, headers: ["Content-Type": "application/json"], body: .init(data: data))
         }
         
-        let systemInstructions = completionRequest.systemInstructions
-        let combinedPrompt = completionRequest.combinedPrompt
-        
-        // Prepare options
-        var options = GenerationOptions()
-        if let temp = completionRequest.temperature {
-            options.sampling = .random(probabilityThreshold: Double(completionRequest.topP ?? 1.0))
-            if temp == 0 {
-                options.sampling = .greedy
-            }
-        } else {
-            options.sampling = .greedy
-        }
-        
-        if let maxTokens = completionRequest.maxTokens {
-            options.maximumResponseTokens = maxTokens
-        }
-
-        // Resolve model and session dynamically
-        let resolvedModel = resolveModel(name: modelName)
-        let session = systemInstructions.isEmpty ? 
-            LanguageModelSession(model: resolvedModel) : 
-            LanguageModelSession(model: resolvedModel, instructions: systemInstructions)
-            
         do {
-            let response = try await session.respond(to: combinedPrompt, options: options)
-            let responseText = response.content
-            
-            let chatResponse = OpenAI.ChatCompletionResponse(
-                id: "chatcmpl-\(UUID().uuidString)",
-                created: Int(Date().timeIntervalSince1970),
-                model: completionRequest.model,
-                choices: [
-                    .init(
-                        index: 0,
-                        message: .init(content: responseText),
-                        finishReason: "stop"
-                    )
-                ],
-                usage: .init(
-                    promptTokens: 0,
-                    completionTokens: 0,
-                    totalTokens: 0
-                )
-            )
-            let data = try JSONEncoder().encode(chatResponse)
+            let response = try await AppleOpenAIClient.shared.chat.completions.create(request: completionRequest)
+            let data = try JSONEncoder().encode(response)
             return Response(status: .ok, headers: ["Content-Type": "application/json"], body: .init(data: data))
-        } catch let abortError as AbortError {
-            let reason = abortError.reason
-            let code: String?
-            let message: String
-            
-            if reason.contains(":") {
-                let parts = reason.split(separator: ":", maxSplits: 1).map(String.init)
-                code = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                message = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
-            } else {
-                code = "api_error"
-                message = reason
-            }
-            
-            let type: String
-            switch abortError.status {
-            case .badRequest:
-                type = "invalid_request_error"
-            case .tooManyRequests:
-                type = "insufficient_quota"
-            case .serviceUnavailable:
-                type = "requests_limit_error"
+        } catch let aiError as AIError {
+            let (status, message, code): (HTTPStatus, String, String)
+            switch aiError {
+            case .guardrailsTriggered:
+                status = .badRequest
+                message = "The request was rejected by safety guardrails."
+                code = "content_policy_violation"
+            case .modelNotFound(let name):
+                status = .notFound
+                message = "Model '\(name)' not found."
+                code = "model_not_found"
             default:
-                type = "api_error"
+                status = .internalServerError
+                message = aiError.localizedDescription
+                code = "internal_error"
             }
-            
             let errorDetail = OpenAI.ErrorResponse.ErrorDetail(
                 message: message,
-                type: type,
+                type: "api_error",
                 param: nil,
                 code: code
+            )
+            let errorResponse = OpenAI.ErrorResponse(error: errorDetail)
+            let data = try JSONEncoder().encode(errorResponse)
+            return Response(status: status, headers: ["Content-Type": "application/json"], body: .init(data: data))
+        } catch let abortError as AbortError {
+            let errorDetail = OpenAI.ErrorResponse.ErrorDetail(
+                message: abortError.reason,
+                type: "api_error",
+                param: nil,
+                code: "api_error"
             )
             let errorResponse = OpenAI.ErrorResponse(error: errorDetail)
             let data = try JSONEncoder().encode(errorResponse)
@@ -137,9 +75,105 @@ func routes(_ app: Application) throws {
         }
     }
     
+    // Route: POST /v1/embeddings
+    app.post("v1", "embeddings") { req async throws -> OpenAI.EmbeddingResponse in
+        let embeddingRequest = try req.content.decode(OpenAI.EmbeddingRequest.self)
+        guard ModelRegistry.isSupported(modelId: embeddingRequest.model) else {
+            throw Abort(.notFound, reason: "Model '\(embeddingRequest.model)' not found.")
+        }
+        return try await AppleOpenAIClient.shared.embeddings.create(embeddingRequest)
+    }
+
+    // Route: POST /v1/index/documents
+    app.post("v1", "index", "documents") { req async throws -> OpenAI.IndexDocumentResponse in
+        let indexRequest = try req.content.decode(OpenAI.IndexDocumentRequest.self)
+        await AppleOpenAIClient.shared.index.add(
+            id: indexRequest.id,
+            title: indexRequest.title,
+            content: indexRequest.content,
+            metadata: indexRequest.metadata
+        )
+        return OpenAI.IndexDocumentResponse(id: indexRequest.id, status: "indexed", chunkCount: 1)
+    }
+
+    // Route: POST /v1/search
+    app.post("v1", "search") { req async throws -> OpenAI.SearchResponse in
+        let searchRequest = try req.content.decode(OpenAI.SearchRequest.self)
+        let mode: SearchMode
+        switch searchRequest.mode {
+        case "vector":
+            mode = .vectorOnly
+        case "spotlight":
+            mode = .spotlightOnly
+        default:
+            if let f = searchRequest.fusion, f.type == "linear" {
+                mode = .hybrid(strategy: LinearRankFusion(alpha: f.vectorWeight ?? 0.5))
+            } else {
+                let k = searchRequest.fusion?.k ?? 60.0
+                let lw = searchRequest.fusion?.lexicalWeight ?? 1.0
+                let vw = searchRequest.fusion?.vectorWeight ?? 1.0
+                mode = .hybrid(k: k, lexicalWeight: lw, vectorWeight: vw)
+            }
+        }
+        let results = await AppleOpenAIClient.shared.index.search(
+            query: searchRequest.query,
+            limit: searchRequest.limit ?? 5,
+            mode: mode,
+            minScore: searchRequest.minScore
+        )
+        return OpenAI.SearchResponse(
+            data: results,
+            query: searchRequest.query,
+            mode: searchRequest.mode ?? "hybrid"
+        )
+    }
+    
+    // Route: POST /v1/audio/speech
+    app.post("v1", "audio", "speech") { req async throws -> Response in
+        let speechRequest = try req.content.decode(OpenAI.AudioSpeechRequest.self)
+        let audioData = try await AppleOpenAIClient.shared.audio.speech.create(speechRequest)
+        return Response(status: .ok, headers: ["Content-Type": "audio/wav"], body: .init(data: audioData))
+    }
+
+    // Route: POST /v1/audio/transcriptions
+    app.post("v1", "audio", "transcriptions") { req async throws -> OpenAI.AudioTranscriptionResponse in
+        guard SpeechRecognitionService.isSupported else {
+            throw Abort(.notImplemented, reason: "Speech recognition (STT) is disabled in this build. Rebuild with speech flag (e.g. ENABLE_SPEECH=1 or --with-speech) enabled.")
+        }
+        if let jsonRequest = try? req.content.decode(OpenAI.AudioTranscriptionRequest.self) {
+            return try await AppleOpenAIClient.shared.audio.transcriptions.create(jsonRequest)
+        }
+        
+        struct MultipartTranscription: Content {
+            var file: File
+            var model: String?
+            var language: String?
+            var prompt: String?
+        }
+        
+        let form = try req.content.decode(MultipartTranscription.self)
+        let audioData = Data(buffer: form.file.data)
+        return try await AppleOpenAIClient.shared.audio.transcriptions.create(
+            file: audioData,
+            filename: form.file.filename,
+            model: form.model ?? "apple-speech-transcribe",
+            language: form.language,
+            prompt: form.prompt
+        )
+    }
+    
+    // Route: POST /v1/images/generations
+    app.post("v1", "images", "generations") { req async throws -> OpenAI.ImageGenerationResponse in
+        let imageRequest = try req.content.decode(OpenAI.ImageGenerationRequest.self)
+        guard ModelRegistry.isSupported(modelId: imageRequest.model) else {
+            throw Abort(.notFound, reason: "Model '\(imageRequest.model)' not found.")
+        }
+        return try await AppleOpenAIClient.shared.images.create(imageRequest)
+    }
+    
     // Route: GET /v1/models
     app.get("v1", "models") { req async in
-        let models = getAvailableModelIds().map { OpenAI.ModelListResponse.Model(id: $0) }
+        let models = ModelRegistry.listModels()
         return OpenAI.ModelListResponse(data: models)
     }
     
@@ -147,123 +181,4 @@ func routes(_ app: Application) throws {
     app.get("health") { req in
         "iOS Bridge is running on port \(app.http.server.configuration.port)"
     }
-}
-
-// MARK: - Model Names & Registry
-
-public enum ModelName: String, CaseIterable, Sendable {
-    case defaultModel = "default"
-    case privateCloudCompute = "apple-intelligence-private-cloud-compute"
-
-    public var id: String { rawValue }
-
-    public var displayName: String {
-        switch self {
-        case .defaultModel:
-            return "System Default: \(ModelRegistry.systemDefaultConcreteName)"
-        case .privateCloudCompute:
-            return "Apple Intelligence Private Cloud Compute (PCC)"
-        }
-    }
-}
-
-public enum ModelRegistry {
-    public typealias Model = ModelName
-
-    public static let defaultModel: ModelName = .defaultModel
-    public static let defaultModelId: String = ModelName.defaultModel.rawValue
-    
-    /// Concrete on-device model backing `SystemLanguageModel.default`, as reported by the system.
-    /// On OS 27+ this is `SystemLanguageModel.variant` (`.core3` or `.coreAdvanced3`).
-    public static var systemDefaultConcreteName: String {
-        if #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) {
-            return SystemLanguageModel.default.variant.displayName
-        }
-        return "Apple On-Device Foundation Model (3B)"
-    }
-
-    /// One-line description of the active system model for startup logging.
-    public static var systemModelDiagnostics: String {
-        let model = SystemLanguageModel.default
-        var parts = ["System model: \(systemDefaultConcreteName)"]
-        if #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) {
-            switch model.variant {
-            case .coreAdvanced3: parts.append("variant: coreAdvanced3")
-            case .core3: parts.append("variant: core3")
-            default: parts.append("variant: unknown")
-            }
-        }
-        parts.append("context: \(model.contextSize) tokens")
-        parts.append("availability: \(model.availability)")
-        return parts.joined(separator: ", ")
-    }
-
-    public static let privateCloudComputeModel: ModelName = .privateCloudCompute
-    public static let privateCloudComputeModelId: String = ModelName.privateCloudCompute.rawValue
-    
-    public static var availableModels: [ModelName] {
-        [
-            defaultModel,
-            privateCloudComputeModel
-        ]
-    }
-
-    public static var availableModelIds: [String] {
-        availableModels.map(\.rawValue)
-    }
-
-    public static func isSupported(modelId: String) -> Bool {
-        let normalized = modelId.hasPrefix("openai/") ? String(modelId.dropFirst("openai/".count)) : modelId
-        return availableModelIds.contains(normalized)
-    }
-
-    public static func resolveModel(name: String) -> any LanguageModel {
-        let normalized = name.hasPrefix("openai/") ? String(name.dropFirst("openai/".count)) : name
-        guard let model = ModelName(rawValue: normalized) else {
-            return SystemLanguageModel.default
-        }
-        return resolveModel(model: model)
-    }
-
-    public static func resolveModel(model: ModelName) -> any LanguageModel {
-        switch model {
-        case .privateCloudCompute:
-            return PrivateCloudComputeLanguageModel()
-        case .defaultModel:
-            return SystemLanguageModel.default
-        }
-    }
-
-    public static func displayName(for modelId: String) -> String {
-        let normalized = modelId.hasPrefix("openai/") ? String(modelId.dropFirst("openai/".count)) : modelId
-        return ModelName(rawValue: normalized)?.displayName ?? modelId
-    }
-}
-
-// MARK: - Routing Helpers
-
-private func getAvailableModelIds() -> [String] {
-    return ModelRegistry.availableModelIds
-}
-
-private func resolveModel(name: String) -> any LanguageModel {
-    return ModelRegistry.resolveModel(name: name)
-}
-
-private func mapNativeError(_ error: Error) -> Abort {
-    if let genError = error as? LanguageModelSession.GenerationError {
-        switch genError {
-        case .exceededContextWindowSize:
-            return Abort(.badRequest, reason: "context_length_exceeded: This model's maximum context length is 4096 tokens.")
-        case .rateLimited:
-            return Abort(.tooManyRequests, reason: "rate_limit_exceeded: You exceeded your current quota for Private Cloud Compute.")
-        case .concurrentRequests:
-            return Abort(.serviceUnavailable, reason: "concurrent_requests_limit: The model is currently processing another request.")
-        case .guardrailViolation:
-            return Abort(.badRequest, reason: "content_policy_violation: The request was rejected by safety guardrails.")
-        default:
-            return Abort(.internalServerError, reason: "unknown_model_error: \(error.localizedDescription)")
-        }
-    }
-    return Abort(.internalServerError, reason: "generation_failed: \(error.localizedDescription)")
 }

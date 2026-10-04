@@ -69,3 +69,18 @@ public extension AIPrompt.Config {
         return options
     }
 }
+
+public extension AIPrompt {
+    static func load(named name: String, bundle: Bundle = .main) throws -> AIPrompt {
+        guard let url = bundle.url(forResource: name, withExtension: "json") else {
+            throw AIError.promptNotFound(name)
+        }
+        return try load(from: url)
+    }
+
+    static func load(from url: URL) throws -> AIPrompt {
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(AIPrompt.self, from: data)
+    }
+}
+

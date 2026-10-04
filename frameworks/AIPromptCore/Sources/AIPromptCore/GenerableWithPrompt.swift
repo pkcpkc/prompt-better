@@ -56,8 +56,8 @@ extension GenerableWithPrompt {
     let range = NSRange(key.startIndex..<key.endIndex, in: key)
     let matches = regex.matches(in: key, options: [], range: range)
 
-    let words = matches.map { match -> String in
-      let matchRange = Range(match.range, in: key)!
+    let words = matches.compactMap { match -> String? in
+      guard let matchRange = Range(match.range, in: key) else { return nil }
       let word = String(key[matchRange])
       return word.prefix(1).uppercased() + word.dropFirst().lowercased()
     }
