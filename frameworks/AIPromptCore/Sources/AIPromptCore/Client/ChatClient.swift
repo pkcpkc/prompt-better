@@ -171,7 +171,7 @@ public final class ChatClient: Sendable {
         }
         
         /// Type-safe structured output generation decoding directly into a @Generable conforming Swift type.
-        public func create<T: Generable>(
+        public func create<T: Generable & Sendable>(
             model: String = ModelRegistry.defaultModelId,
             messages: [OpenAI.ChatCompletionRequest.Message],
             generating type: T.Type,

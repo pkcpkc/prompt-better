@@ -1,8 +1,7 @@
 import Foundation
 import FoundationModels
 
-@MainActor
-public final class AISessionController {
+public actor AISessionController {
   public static let shared = AISessionController()
   private var session: LanguageModelSession?
   private var isBusy = false
@@ -57,7 +56,7 @@ public final class AISessionController {
           T.options
           ?? {
             var o = GenerationOptions()
-            o.sampling = .greedy
+            o.samplingMode = .greedy
             return o
           }()
         let response = try await session.respond(to: userPrompt, generating: type, options: options)
@@ -104,7 +103,7 @@ public final class AISessionController {
   }
 
   /// Sends a prompt and decodes the response into a schema-conforming Generable type.
-  public func respond<T: Generable>(
+  public func respond<T: Generable & Sendable>(
     to prompt: String,
     generating type: T.Type,
     options: GenerationOptions? = nil,

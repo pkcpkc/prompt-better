@@ -3,7 +3,7 @@ import FoundationModels
 
 // MARK: - Protocol
 
-public protocol GenerableWithPrompt: Generable {
+public protocol GenerableWithPrompt: Generable, Sendable {
   /// Template string with `{{placeholder}}` tokens.
   /// `{{input}}` is always replaced with the primary input.
   /// Additional keys are passed via the `context` dictionary.

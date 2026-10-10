@@ -43,9 +43,9 @@ struct {{ spec.name }}: GenerableWithPrompt {
     static var options: GenerationOptions? = {
         var options = GenerationOptions()
 {% if spec.config.temperature > 0.0 %}
-        options.sampling = .random(probabilityThreshold: {{ spec.config.top_p }})
+        options.samplingMode = .random(probabilityThreshold: {{ spec.config.top_p }})
 {% else %}
-        options.sampling = .greedy
+        options.samplingMode = .greedy
 {% endif %}
 {% if spec.config.max_tokens is not none %}
         options.maximumResponseTokens = {{ spec.config.max_tokens }}

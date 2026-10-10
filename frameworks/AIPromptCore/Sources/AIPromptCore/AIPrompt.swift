@@ -61,9 +61,9 @@ public extension AIPrompt.Config {
     func toGenerationOptions() -> GenerationOptions {
         var options = GenerationOptions()
         if temperature > 0.0 {
-            options.sampling = .random(probabilityThreshold: topP)
+            options.samplingMode = .random(probabilityThreshold: topP)
         } else {
-            options.sampling = .greedy
+            options.samplingMode = .greedy
         }
         options.maximumResponseTokens = maxTokens
         return options
