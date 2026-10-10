@@ -16,7 +16,7 @@ public extension OpenAI {
         
         public init(
             prompt: String,
-            model: String = "apple-image-creator",
+            model: String = "apple-image-playground",
             n: Int? = 1,
             quality: String? = "standard",
             responseFormat: String? = "b64_json",

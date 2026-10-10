@@ -120,8 +120,8 @@ final class AppTests: XCTestCase {
     }) { res async throws in
       XCTAssertEqual(res.status, .notFound)
       let errorResponse = try res.content.decode(OpenAI.ErrorResponse.self)
-      XCTAssertEqual(errorResponse.error.code, "api_error")
-      XCTAssertEqual(errorResponse.error.type, "api_error")
+      XCTAssertEqual(errorResponse.error.code, "model_not_found")
+      XCTAssertEqual(errorResponse.error.type, "invalid_request_error")
       XCTAssertTrue(errorResponse.error.message.contains("not found"))
     }
   }
@@ -223,7 +223,7 @@ final class AppTests: XCTestCase {
   func testImageGenerationEndpoint() async throws {
     let imageReq = OpenAI.ImageGenerationRequest(
       prompt: "A futuristic cybernetic falcon in flight",
-      model: "apple-image-creator",
+      model: "apple-image-playground",
       responseFormat: "b64_json",
       size: "256x256"
     )
@@ -231,10 +231,13 @@ final class AppTests: XCTestCase {
     try await app.test(.POST, "v1/images/generations", beforeRequest: { req in
       try req.content.encode(imageReq)
     }) { res async throws in
-      XCTAssertEqual(res.status, .ok)
-      let response = try res.content.decode(OpenAI.ImageGenerationResponse.self)
-      XCTAssertEqual(response.data.count, 1)
-      XCTAssertNotNil(response.data.first?.b64Json)
+      // Real generation needs Apple Intelligence; without it the route reports 503 rather than fake an image.
+      XCTAssertTrue(res.status == .ok || res.status == .serviceUnavailable)
+      if res.status == .ok {
+        let response = try res.content.decode(OpenAI.ImageGenerationResponse.self)
+        XCTAssertEqual(response.data.count, 1)
+        XCTAssertNotNil(response.data.first?.b64Json)
+      }
     }
   }
 }

@@ -133,12 +133,13 @@ public enum OpenAI {
             
             public init(from decoder: Decoder) throws {
                 let container = try decoder.singleValueContainer()
-                if let str = try? container.decode(String.self) {
+                if container.decodeNil() {
+                    self = .text("")  // OpenAI allows null content (e.g. assistant messages)
+                } else if let str = try? container.decode(String.self) {
                     self = .text(str)
-                } else if let parts = try? container.decode([ContentPart].self) {
-                    self = .parts(parts)
                 } else {
-                    self = .text("")
+                    // Propagate decoding errors instead of falling back to empty text.
+                    self = .parts(try container.decode([ContentPart].self))
                 }
             }
             
@@ -229,8 +230,11 @@ public enum OpenAI {
                     let doc = try container.decode(DocumentAttachment.self, forKey: .document)
                     self = .document(doc)
                 default:
-                    let text = try? container.decode(String.self, forKey: .text)
-                    self = .text(text ?? "")
+                    throw DecodingError.dataCorruptedError(
+                        forKey: .type,
+                        in: container,
+                        debugDescription: "Unsupported content part type '\(type)'. Supported: text, image_url, input_audio, document."
+                    )
                 }
             }
             
@@ -340,17 +344,31 @@ public enum OpenAI {
             public var object: String
             public let created: Int
             public let ownedBy: String
+            /// Model type (`llm`, `multimodal`, `ocr`, `stt`, `embedding`, ...). Extension to the OpenAI schema.
+            public let type: String?
+            /// Accepted input kinds (`text`, `image`, `audio`, `document`). Extension to the OpenAI schema.
+            public let inputModalities: [String]?
             
-            public init(id: String, created: Int = Int(Date().timeIntervalSince1970), ownedBy: String = "apple", object: String = "model") {
+            public init(
+                id: String,
+                created: Int = Int(Date().timeIntervalSince1970),
+                ownedBy: String = "apple",
+                object: String = "model",
+                type: ModelType? = nil,
+                inputModalities: Set<InputModality>? = nil
+            ) {
                 self.id = id
                 self.object = object
                 self.created = created
                 self.ownedBy = ownedBy
+                self.type = type?.rawValue
+                self.inputModalities = inputModalities.map { $0.map(\.rawValue).sorted() }
             }
             
             public enum CodingKeys: String, CodingKey {
-                case id, object, created
+                case id, object, created, type
                 case ownedBy = "owned_by"
+                case inputModalities = "input_modalities"
             }
         }
     }

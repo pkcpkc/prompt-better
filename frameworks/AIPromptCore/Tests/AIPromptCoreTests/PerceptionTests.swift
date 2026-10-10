@@ -55,15 +55,19 @@ final class PerceptionTests: XCTestCase {
     }
 
     @MainActor
-    func testStandaloneOCRBypass() async throws {
+    func testStandaloneOCRRequiresImage() async {
         let client = ChatClient()
         let request = OpenAI.ChatCompletionRequest(
             model: "apple-vision-ocr",
-            messages: [.init(role: "user", content: "Fallback text when no image")]
+            messages: [.init(role: "user", content: "No image attached")]
         )
         
-        let response = try await client.completions.create(request: request)
-        XCTAssertEqual(response.model, "apple-vision-ocr")
-        XCTAssertFalse(response.choices.isEmpty)
+        do {
+            _ = try await client.completions.create(request: request)
+            XCTFail("OCR without an image must fail instead of echoing the prompt")
+        } catch AIError.unsupportedOperation {
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
     }
 }

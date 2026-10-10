@@ -6,7 +6,7 @@ public struct SettingsView: View {
     @State private var enableOpenAIAliases: Bool
     @State private var customAliases: [AliasEntry] = []
     @State private var newAliasKey: String = ""
-    @State private var newAliasTarget: String = CanonicalModel.foundationOmni.rawValue
+    @State private var newAliasTarget: String = CanonicalModel.omni.rawValue
     @State private var indexCounts: (spotlight: Int, vector: Int) = (0, 0)
     @State private var showResetConfirmation: Bool = false
     

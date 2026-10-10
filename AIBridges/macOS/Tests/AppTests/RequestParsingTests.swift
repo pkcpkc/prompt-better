@@ -3,14 +3,8 @@ import FoundationModels
 import XCTVapor
 
 @MainActor
-final class LocalAIBridgeTests: XCTestCase {
+final class RequestParsingTests: XCTestCase {
     
-    func testPromptGeneration() async throws {
-        // We simulate how the LocalAIBridge processes messages
-        let bridge = LocalAIBridge.shared
-        XCTAssertNotNil(bridge)
-    }
-
     func testRequestParsingExtensions() throws {
         // 1. Standard test: System + User
         let request1 = OpenAI.ChatCompletionRequest(

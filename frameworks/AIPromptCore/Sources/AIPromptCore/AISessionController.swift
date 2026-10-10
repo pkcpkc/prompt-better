@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import FoundationModels
 
 public actor AISessionController {
@@ -97,6 +98,39 @@ public actor AISessionController {
         || error.localizedDescription.localizedCaseInsensitiveContains("unsafe")
         || error.localizedDescription.localizedCaseInsensitiveContains("guardrail")
         || error.localizedDescription.localizedCaseInsensitiveContains("safety") {
+        throw AIError.guardrailsTriggered
+      }
+    }
+  }
+
+  /// Sends a text prompt together with images. Requires an image-capable model (OS 27+, advanced tier).
+  public func respond(
+    to prompt: String,
+    images: [CGImage],
+    options: GenerationOptions? = nil,
+    model: (any LanguageModel)? = nil,
+    instructions: String? = nil
+  ) async throws -> String {
+    guard #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) else {
+      throw AIError.unsupportedOperation("Image input requires OS 27 or later.")
+    }
+    return try await runSerialized {
+      // Image prompts always get a fresh session so attachments do not accumulate in the transcript.
+      let session = try await self.ensureSession(model: model, instructions: instructions, forceNew: true)
+      let generationOptions = options ?? {
+        var o = GenerationOptions()
+        o.samplingMode = .greedy
+        return o
+      }()
+      let fullPrompt = Prompt {
+        prompt
+        for image in images {
+          Attachment(image)
+        }
+      }
+      do {
+        return try await session.respond(to: fullPrompt, options: generationOptions).content
+      } catch LanguageModelSession.GenerationError.guardrailViolation {
         throw AIError.guardrailsTriggered
       }
     }

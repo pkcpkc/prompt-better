@@ -1,7 +1,7 @@
 import Foundation
 
 /// Manages built-in standard aliases (e.g., whisper-1 -> apple-speech-transcribe)
-/// and user-defined custom aliases (e.g., my-model -> apple-foundation-omni).
+/// and user-defined custom aliases (e.g., my-model -> omni).
 public final class AliasConfiguration: @unchecked Sendable {
     public static let shared = AliasConfiguration()
     
@@ -96,7 +96,7 @@ public final class AliasConfiguration: @unchecked Sendable {
             switch normalized.lowercased() {
             // Chat
             case "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo":
-                return "apple-foundation-omni"
+                return "omni"
             // Audio STT
             case "whisper-1", "whisper":
                 return "apple-speech-transcribe"
@@ -106,12 +106,12 @@ public final class AliasConfiguration: @unchecked Sendable {
             // Embeddings
             case "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002":
                 return "apple-sentence-embedding"
-            // Moderations
-            case "text-moderation-latest", "text-moderation-stable", "omni-moderation-latest":
+            // Moderations (images only; text is rejected)
+            case "omni-moderation-latest":
                 return "apple-sensitive-content"
             // Image Generation
             case "dall-e-3", "dall-e-2", "dall-e":
-                return "apple-image-creator"
+                return "apple-image-playground"
             default:
                 break
             }

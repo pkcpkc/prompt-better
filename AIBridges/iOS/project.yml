@@ -10,6 +10,8 @@ packages:
     from: 4.89.0
   AIPromptCore:
     path: ../../frameworks/AIPromptCore
+  AIBridgeKit:
+    path: ../Shared
 targets:
   iosAIBridge:
     type: application
@@ -22,6 +24,8 @@ targets:
       - package: AIPromptCore
         product: AIPromptCore
         embed: true
+      - package: AIBridgeKit
+        product: AIBridgeKit
     settings:
       base:
         # Standard search paths for frameworks/libraries
@@ -44,6 +48,8 @@ targets:
       - package: AIPromptCore
         product: AIPromptCore
         embed: true
+      - package: AIBridgeKit
+        product: AIBridgeKit
     settings:
       base:
         # Standard search paths for frameworks/libraries
@@ -59,3 +65,16 @@ targets:
         ENABLE_APP_SANDBOX: "NO"
         CODE_SIGN_ENTITLEMENTS: macAIBridge.entitlements
 
+schemes:
+  iosAIBridge:
+    build:
+      targets:
+        iosAIBridge: all
+    run:
+      config: Debug
+  macAIBridge:
+    build:
+      targets:
+        macAIBridge: all
+    run:
+      config: Debug

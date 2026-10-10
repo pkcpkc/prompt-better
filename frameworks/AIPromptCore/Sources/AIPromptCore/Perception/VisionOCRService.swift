@@ -25,7 +25,11 @@ public final class VisionOCRService: @unchecked Sendable {
         request.usesLanguageCorrection = true
         
         let handler = VNImageRequestHandler(data: imageData, options: [:])
-        try handler.perform([request])
+        do {
+            try handler.perform([request])
+        } catch {
+            throw AIError.unsupportedOperation("Could not read the image for OCR: \(error.localizedDescription)")
+        }
         
         guard let observations = request.results else {
             return ""
@@ -40,23 +44,7 @@ public final class VisionOCRService: @unchecked Sendable {
     
     /// Recognizes text from an image URL (file URL or base64 data URI).
     public func recognizeText(fromURL urlString: String) async throws -> String {
-        let imageData: Data
-        
-        if urlString.hasPrefix("data:image") {
-            let base64 = urlString.components(separatedBy: ",").last ?? urlString
-            guard let data = Data(base64Encoded: base64) else { return "" }
-            imageData = data
-        } else if let url = URL(string: urlString), url.scheme != nil {
-            imageData = (try? Data(contentsOf: url)) ?? Data()
-        } else if let fileData = try? Data(contentsOf: URL(fileURLWithPath: urlString)) {
-            imageData = fileData
-        } else if let rawData = Data(base64Encoded: urlString) {
-            imageData = rawData
-        } else {
-            return ""
-        }
-        
-        return try await recognizeText(from: imageData)
+        return try await recognizeText(from: ImageLoading.data(fromReference: urlString))
     }
     
     /// Extracts text from a PDF document using PDFKit.

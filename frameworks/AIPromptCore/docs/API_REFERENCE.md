@@ -19,7 +19,7 @@ let client = AppleOpenAIClient.shared
 ```swift
 // Standard inference
 let response = try await client.chat.completions.create(
-    model: "apple-foundation-omni", // or "default", "gpt-4o"
+    model: "omni", // or "default", "gpt-4o"
     messages: [
         .init(role: "user", content: "Summarize today's release notes.")
     ],
@@ -48,7 +48,7 @@ let multimodalMessage = OpenAI.ChatCompletionRequest.Message(
     ]
 )
 let response = try await client.chat.completions.create(
-    model: "apple-foundation-omni",
+    model: "omni",
     messages: [multimodalMessage]
 )
 ```
@@ -56,7 +56,7 @@ let response = try await client.chat.completions.create(
 #### Auto-RAG Retrieval
 ```swift
 let ragResponse = try await client.chat.completions.create(
-    model: "apple-foundation-omni",
+    model: "omni",
     messages: [.init(role: "user", content: "What were our Q3 earnings?")],
     rag: .init(enabled: true, mode: "hybrid", limit: 3)
 )
@@ -144,33 +144,10 @@ print("Recognized: \(transcription.text)")
 
 ### In-Process Image Generation (`client.images`)
 
-Generate images on-device using two distinct Apple Intelligence models:
+Generate images on-device with Apple Image Playground.
 
-#### Model 1: Apple Image Creator (`apple-image-creator`)
-Headless, programmatic image generation that works completely out of the box without requiring manual UI interaction.
-
-```swift
-let response = try await client.images.generate(
-    prompt: "Futuristic autonomous rover exploring icy planetary rings",
-    model: "apple-image-creator", // or alias "dall-e-3"
-    size: "1024x1024",
-    style: "illustration", // "animation", "illustration", "sketch"
-    responseFormat: "b64_json"
-)
-
-let base64PNG = response.data.first?.b64Json
-```
-
-Convenience SDK shorthand:
-```swift
-let response = try await client.images.generateCreator(
-    prompt: "Cyberpunk street in rain with neon reflections",
-    style: "illustration"
-)
-```
-
-#### Model 2: Apple Image Playground (`apple-image-playground`)
-Launches the native Apple Image Playground UI workflow behind the scenes (presenting `ImagePlaygroundViewController` on iOS / AppKit presentation on macOS) or synthesizes playground concepts in headless/server modes.
+#### Apple Image Playground (`apple-image-playground`)
+Presents the system Image Playground sheet (`ImagePlaygroundViewController`) over the frontmost window, pre-filled with the prompt, and returns the image the user picks. It needs a foreground window and a person to choose; with no window, or if the user cancels, it throws `ImageGenerationError` (the HTTP routes answer `503`).
 
 ```swift
 let response = try await client.images.generate(
@@ -201,7 +178,7 @@ The macOS bridge (`AIBridges/macOS`) and iOS bridge (`AIBridges/iOS`) expose sta
 | `POST` | `/v1/embeddings` | Dense vector embedding extraction (`apple-sentence-embedding`, `apple-vision-featureprint`) |
 | `POST` | `/v1/audio/transcriptions` | Speech-to-text recognition from WAV audio (`multipart/form-data` or JSON) |
 | `POST` | `/v1/audio/speech` | Text-to-speech synthesis returning WAV audio stream |
-| `POST` | `/v1/images/generations` | Image generation using `apple-image-creator` (programmatic) or `apple-image-playground` (UI) |
+| `POST` | `/v1/images/generations` | Image generation using `apple-image-playground` (system sheet; the user picks the image) |
 | `POST` | `/v1/index/documents` | Add document to local CoreSpotlight and Vector stores |
 | `POST` | `/v1/search` | Query local stores with `.vector`, `.spotlight`, or `.hybrid` fusion |
 | `GET` | `/v1/models` | List all available canonical models and active custom/OpenAI aliases |

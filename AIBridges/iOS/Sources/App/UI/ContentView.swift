@@ -6,6 +6,24 @@ struct ContentView: View {
   @State private var showSettings = false
 
   var body: some View {
+    #if os(macOS)
+    // On macOS the chat replaces the dashboard in the window; a sheet would be a small floating panel.
+    if showChat {
+      ChatRootView(onClose: { showChat = false })
+        .environmentObject(serverManager)
+    } else {
+      dashboard
+    }
+    #else
+    dashboard
+      .fullScreenCover(isPresented: $showChat) {
+        ChatRootView(onClose: { showChat = false })
+          .environmentObject(serverManager)
+      }
+    #endif
+  }
+
+  private var dashboard: some View {
     NavigationStack {
       VStack(spacing: 20) {
         // Custom Header Row
@@ -100,10 +118,6 @@ struct ContentView: View {
 #if os(iOS)
       .toolbar(.hidden, for: .navigationBar)
 #endif
-      .sheet(isPresented: $showChat) {
-        ChatWindowView()
-          .environmentObject(serverManager)
-      }
       .sheet(isPresented: $showSettings) {
         NavigationStack {
           SettingsView()

@@ -126,11 +126,11 @@ You can configure model aliases programmatically or via environment variables:
 AliasConfiguration.shared.enableOpenAIAliases = true
 
 // Add custom alias for an internal tool or agent
-AliasConfiguration.shared.setAlias(alias: "summarizer-agent", target: "apple-foundation-omni")
+AliasConfiguration.shared.setAlias(alias: "summarizer-agent", target: "omni")
 ```
 
 Or via environment variables:
 ```bash
 export ENABLE_OPENAI_ALIASES=true
-export MODEL_ALIASES='{"research-bot": "apple-foundation-omni"}'
+export MODEL_ALIASES='{"research-bot": "omni"}'
 ```

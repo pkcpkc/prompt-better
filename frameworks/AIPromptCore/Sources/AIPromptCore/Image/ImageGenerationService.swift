@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import ImageIO
+import UniformTypeIdentifiers
 
 #if canImport(AppKit)
 import AppKit
@@ -14,219 +15,170 @@ import UIKit
 import ImagePlayground
 #endif
 
-/// In-process service providing on-device image generation via Apple Image Playground and Image Creator.
-public final class ImageGenerationService: @unchecked Sendable {
-    public static let shared = ImageGenerationService()
-    
-    public init() {}
-    
-    /// Generates images based on OpenAI ImageGenerationRequest.
-    public func generate(request: OpenAI.ImageGenerationRequest) async throws -> OpenAI.ImageGenerationResponse {
-        let canonicalModel = ModelRegistry.resolveCanonicalId(request.model)
-        let count = max(1, min(request.n ?? 1, 4))
-        
-        var generatedObjects: [OpenAI.ImageObject] = []
-        
-        switch canonicalModel {
-        case CanonicalModel.imagePlayground.rawValue:
-            // 1. Apple Image Playground (launches required UI / playground workflow behind the scenes)
-            for _ in 0..<count {
-                let imgObj = try await generateWithImagePlayground(request: request)
-                generatedObjects.append(imgObj)
-            }
-            
-        case CanonicalModel.imageCreator.rawValue:
-            fallthrough
-        default:
-            // 2. Apple Image Creator (programmatic out-of-the-box generation without UI prompt)
-            for _ in 0..<count {
-                let imgObj = try await generateWithImageCreator(request: request)
-                generatedObjects.append(imgObj)
-            }
+/// Why an image could not be generated.
+public enum ImageGenerationError: Error, LocalizedError, Sendable {
+    /// The generator cannot run here: Apple Intelligence is off or unsupported, or there is no window to host Image Playground.
+    case unavailable(String)
+    /// The user closed Image Playground without choosing an image.
+    case cancelled
+    case noImage
+
+    public var errorDescription: String? {
+        switch self {
+        case .unavailable(let reason): return "Image generation is unavailable: \(reason)"
+        case .cancelled: return "Image generation was cancelled."
+        case .noImage: return "The image generator returned no image."
         }
-        
-        return OpenAI.ImageGenerationResponse(
-            created: Int(Date().timeIntervalSince1970),
-            data: generatedObjects
-        )
-    }
-    
-    // MARK: - Model 1: Apple Image Playground (Interactive UI Behind the Scenes)
-    
-    @MainActor
-    private func generateWithImagePlayground(request: OpenAI.ImageGenerationRequest) async throws -> OpenAI.ImageObject {
-        let prompt = request.prompt
-        let style = request.style ?? "animation"
-        
-        #if canImport(ImagePlayground)
-        if #available(iOS 18.2, macOS 15.2, *) {
-            // If in an active window/app environment with UI host
-            #if os(iOS)
-            if let windowScene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-               let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController {
-                return try await withCheckedThrowingContinuation { continuation in
-                    // ImagePlaygroundViewController launch
-                    let playgroundVC = ImagePlaygroundViewController()
-                    playgroundVC.concepts = [.text(prompt)]
-                    
-                    // Present Playground behind the scenes / in current window
-                    rootVC.present(playgroundVC, animated: true)
-                    
-                    // Fallback continuation after setup
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        let pngData = self.renderProgrammaticImage(prompt: prompt, style: "Playground: \(style)", size: request.size ?? "1024x1024")
-                        continuation.resume(returning: self.formatImageObject(pngData: pngData, format: request.responseFormat))
-                    }
-                }
-            }
-            #endif
-        }
-        #endif
-        
-        // Headless / Server / Background fallback: executes playground synthesis pipeline
-        let pngData = renderProgrammaticImage(prompt: prompt, style: "ImagePlayground (\(style))", size: request.size ?? "1024x1024")
-        return formatImageObject(pngData: pngData, format: request.responseFormat, revisedPrompt: "ImagePlayground: \(prompt)")
-    }
-    
-    // MARK: - Model 2: Apple Image Creator (Programmatic Out-of-the-Box)
-    
-    public func generateWithImageCreator(request: OpenAI.ImageGenerationRequest) async throws -> OpenAI.ImageObject {
-        let prompt = request.prompt
-        let size = request.size ?? "1024x1024"
-        let style = request.style ?? "illustration"
-        
-        // Generate high-resolution image data out-of-the-box
-        let pngData = renderProgrammaticImage(prompt: prompt, style: style, size: size)
-        return formatImageObject(pngData: pngData, format: request.responseFormat, revisedPrompt: "ImageCreator: \(prompt)")
-    }
-    
-    // MARK: - Image Rendering & Formatting Helpers
-    
-    private func formatImageObject(pngData: Data, format: String?, revisedPrompt: String? = nil) -> OpenAI.ImageObject {
-        let isB64 = (format == "b64_json" || format == nil)
-        
-        if isB64 {
-            let base64 = pngData.base64EncodedString()
-            return OpenAI.ImageObject(b64Json: base64, url: nil, revisedPrompt: revisedPrompt)
-        } else {
-            // Save to temp directory and return file URL
-            let filename = "generated-\(UUID().uuidString).png"
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-            try? pngData.write(to: tempURL)
-            return OpenAI.ImageObject(b64Json: nil, url: tempURL.absoluteString, revisedPrompt: revisedPrompt)
-        }
-    }
-    
-    public func renderProgrammaticImage(prompt: String, style: String, size: String) -> Data {
-        let dimensions = parseDimensions(size)
-        let width = Int(dimensions.width)
-        let height = Int(dimensions.height)
-        
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
-        
-        guard let context = CGContext(
-            data: nil,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo.rawValue
-        ) else {
-            return generateMinimalPNG()
-        }
-        
-        // 1. Draw rich stylized gradient background
-        let colors: [CGColor]
-        if style.lowercased().contains("sketch") {
-            colors = [
-                CGColor(red: 0.95, green: 0.95, blue: 0.95, alpha: 1.0),
-                CGColor(red: 0.85, green: 0.85, blue: 0.88, alpha: 1.0)
-            ]
-        } else if style.lowercased().contains("animation") || style.lowercased().contains("playground") {
-            colors = [
-                CGColor(red: 0.35, green: 0.20, blue: 0.85, alpha: 1.0),
-                CGColor(red: 0.95, green: 0.35, blue: 0.65, alpha: 1.0),
-                CGColor(red: 0.20, green: 0.75, blue: 0.95, alpha: 1.0)
-            ]
-        } else {
-            // Illustration / Vivid
-            colors = [
-                CGColor(red: 0.10, green: 0.45, blue: 0.90, alpha: 1.0),
-                CGColor(red: 0.05, green: 0.70, blue: 0.60, alpha: 1.0),
-                CGColor(red: 0.95, green: 0.65, blue: 0.15, alpha: 1.0)
-            ]
-        }
-        
-        if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors as CFArray, locations: nil) {
-            context.drawLinearGradient(
-                gradient,
-                start: CGPoint(x: 0, y: 0),
-                end: CGPoint(x: CGFloat(width), y: CGFloat(height)),
-                options: []
-            )
-        }
-        
-        // 2. Draw aesthetic concentric geometric shapes reflecting prompt entropy
-        var hash = UInt64(5381)
-        for byte in prompt.utf8 {
-            hash = ((hash << 5) &+ hash) &+ UInt64(byte)
-        }
-        
-        let shapeCount = 5 + Int(hash % 6)
-        for i in 0..<shapeCount {
-            let radius = CGFloat(width) * CGFloat(0.15 + Double(i) * 0.08)
-            let cx = CGFloat(width) * CGFloat(0.3 + Double((hash &+ UInt64(i * 17)) % 40) / 100.0)
-            let cy = CGFloat(height) * CGFloat(0.3 + Double((hash &+ UInt64(i * 29)) % 40) / 100.0)
-            
-            context.saveGState()
-            context.setAlpha(0.25)
-            context.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.8))
-            context.setLineWidth(CGFloat(3 + i * 2))
-            context.strokeEllipse(in: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
-            context.restoreGState()
-        }
-        
-        // 3. Render into PNG Data
-        guard let cgImage = context.makeImage() else {
-            return generateMinimalPNG()
-        }
-        
-        let mutableData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(mutableData as CFMutableData, "public.png" as CFString, 1, nil) else {
-            return generateMinimalPNG()
-        }
-        
-        CGImageDestinationAddImage(destination, cgImage, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            return generateMinimalPNG()
-        }
-        
-        return mutableData as Data
-    }
-    
-    private func parseDimensions(_ size: String) -> CGSize {
-        let parts = size.lowercased().split(separator: "x")
-        if parts.count == 2, let w = Double(parts[0]), let h = Double(parts[1]) {
-            return CGSize(width: w, height: h)
-        }
-        return CGSize(width: 1024, height: 1024)
-    }
-    
-    private func generateMinimalPNG() -> Data {
-        // Fallback valid minimal 1x1 transparent PNG bytes
-        let bytes: [UInt8] = [
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-            0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
-            0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
-            0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
-            0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
-            0x42, 0x60, 0x82
-        ]
-        return Data(bytes)
     }
 }
+
+/// On-device image generation through Apple's Image Playground framework.
+///
+/// `apple-image-playground` presents the system Image Playground sheet over the frontmost window,
+/// pre-filled with the prompt, and returns the image the user picks. There is no headless path: Apple
+/// deprecated `ImageCreator` in favour of the view controller and the SwiftUI sheet.
+///
+/// The API takes no output size, so `size` is ignored.
+public final class ImageGenerationService: @unchecked Sendable {
+    public static let shared = ImageGenerationService()
+
+    public init() {}
+
+    /// Generates images based on OpenAI ImageGenerationRequest.
+    public func generate(request: OpenAI.ImageGenerationRequest) async throws -> OpenAI.ImageGenerationResponse {
+        let count = max(1, min(request.n ?? 1, 4))
+
+        var generatedObjects: [OpenAI.ImageObject] = []
+        for _ in 0..<count {
+            let png = try await generateWithImagePlayground(request: request)
+            generatedObjects.append(formatImageObject(pngData: png, format: request.responseFormat))
+        }
+
+        return OpenAI.ImageGenerationResponse(created: Int(Date().timeIntervalSince1970), data: generatedObjects)
+    }
+
+    // MARK: - Apple Image Playground (system UI)
+
+    @MainActor
+    private func generateWithImagePlayground(request: OpenAI.ImageGenerationRequest) async throws -> Data {
+        #if canImport(ImagePlayground)
+        let data = try await PlaygroundSession().run(prompt: request.prompt, styleName: request.style)
+        return try Self.pngData(fromImageData: data)
+        #else
+        throw ImageGenerationError.unavailable("ImagePlayground is not available on this platform.")
+        #endif
+    }
+
+    // MARK: - Encoding
+
+    private func formatImageObject(pngData: Data, format: String?) -> OpenAI.ImageObject {
+        if format == "b64_json" || format == nil {
+            return OpenAI.ImageObject(b64Json: pngData.base64EncodedString())
+        }
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("generated-\(UUID().uuidString).png")
+        try? pngData.write(to: tempURL)
+        return OpenAI.ImageObject(url: tempURL.absoluteString)
+    }
+
+    static func pngData(from image: CGImage) throws -> Data {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
+            throw ImageGenerationError.noImage
+        }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { throw ImageGenerationError.noImage }
+        return data as Data
+    }
+
+    static func pngData(fromImageData data: Data) throws -> Data {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw ImageGenerationError.noImage
+        }
+        return try pngData(from: image)
+    }
+}
+
+#if canImport(ImagePlayground)
+/// Presents one Image Playground sheet and waits for the user's choice. Held strongly while the sheet is
+/// up because the view controller only keeps a weak reference to its delegate.
+@MainActor
+private final class PlaygroundSession: NSObject, ImagePlaygroundViewController.Delegate {
+    private var continuation: CheckedContinuation<Data, Error>?
+
+    func run(prompt: String, styleName: String?) async throws -> Data {
+        guard ImagePlaygroundViewController.isAvailable else {
+            throw ImageGenerationError.unavailable("Image Playground requires Apple Intelligence to be enabled.")
+        }
+        let controller = ImagePlaygroundViewController()
+        controller.concepts = [.text(prompt)]
+        if let style = Self.style(named: styleName), controller.allowedGenerationStyles.contains(style) {
+            controller.selectedGenerationStyle = style
+        }
+        controller.delegate = self
+
+        return try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            if !present(controller) {
+                self.continuation = nil
+                continuation.resume(throwing: ImageGenerationError.unavailable("There is no foreground window to present Image Playground in."))
+            }
+        }
+    }
+
+    private static func style(named name: String?) -> ImagePlaygroundStyle? {
+        switch name?.lowercased() {
+        case "animation": return .animation
+        case "illustration": return .illustration
+        case "sketch": return .sketch
+        case "emoji": return .emoji
+        default: return nil
+        }
+    }
+
+    private func present(_ controller: ImagePlaygroundViewController) -> Bool {
+        #if os(iOS)
+        guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+              var top = scene.keyWindow?.rootViewController else { return false }
+        while let presented = top.presentedViewController { top = presented }
+        top.present(controller, animated: true)
+        return true
+        #elseif os(macOS)
+        // NSApp is nil in processes without an NSApplication (command-line tools, test runners).
+        let app: NSApplication? = NSApp
+        guard let host = (app?.keyWindow ?? app?.mainWindow)?.contentViewController else { return false }
+        host.presentAsSheet(controller)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    private func dismiss(_ controller: ImagePlaygroundViewController) {
+        #if os(iOS)
+        controller.dismiss(animated: true)
+        #elseif os(macOS)
+        controller.dismiss(nil)
+        #endif
+    }
+
+    func imagePlaygroundViewController(_ imagePlaygroundViewController: ImagePlaygroundViewController, didCreateImageAt imageURL: URL) {
+        dismiss(imagePlaygroundViewController)
+        // Read now: the file is the system's to clean up once the sheet is gone.
+        if let data = try? Data(contentsOf: imageURL) {
+            continuation?.resume(returning: data)
+        } else {
+            continuation?.resume(throwing: ImageGenerationError.noImage)
+        }
+        continuation = nil
+    }
+
+    func imagePlaygroundViewControllerDidCancel(_ imagePlaygroundViewController: ImagePlaygroundViewController) {
+        dismiss(imagePlaygroundViewController)
+        continuation?.resume(throwing: ImageGenerationError.cancelled)
+        continuation = nil
+    }
+}
+#endif

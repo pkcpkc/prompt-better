@@ -159,7 +159,7 @@ When querying chat completions, you can request automatic on-device context retr
 
 ```swift
 let response = try await client.chat.completions.create(
-    model: "apple-foundation-omni",
+    model: "omni",
     messages: [.init(role: "user", content: "What is our refund policy for digital goods?")],
     rag: .init(
         enabled: true,

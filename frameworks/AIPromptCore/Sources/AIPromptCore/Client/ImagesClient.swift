@@ -1,7 +1,7 @@
 import Foundation
 
 /// In-process Images client providing OpenAI-compatible image generation
-/// via Apple Image Playground (interactive) and Apple Image Creator (programmatic out-of-the-box).
+/// via Apple Image Playground (the system sheet, which the user completes).
 @MainActor
 public final class ImagesClient: Sendable {
     private let service: ImageGenerationService
@@ -13,7 +13,7 @@ public final class ImagesClient: Sendable {
     /// Generates images matching the OpenAI SDK `client.images.generate(...)` signature.
     public func generate(
         prompt: String,
-        model: String = "apple-image-creator",
+        model: String = "apple-image-playground",
         n: Int? = 1,
         quality: String? = "standard",
         responseFormat: String? = "b64_json",
@@ -49,22 +49,6 @@ public final class ImagesClient: Sendable {
         return try await generate(
             prompt: prompt,
             model: "apple-image-playground",
-            responseFormat: responseFormat,
-            size: size,
-            style: style
-        )
-    }
-    
-    /// Generates an image using the Apple Image Creator (headless out-of-the-box).
-    public func generateCreator(
-        prompt: String,
-        style: String = "illustration",
-        size: String = "1024x1024",
-        responseFormat: String = "b64_json"
-    ) async throws -> OpenAI.ImageGenerationResponse {
-        return try await generate(
-            prompt: prompt,
-            model: "apple-image-creator",
             responseFormat: responseFormat,
             size: size,
             style: style

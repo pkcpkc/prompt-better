@@ -1,4 +1,5 @@
 import XCTest
+import FoundationModels
 @testable import AIPromptCore
 
 final class ModelRegistryAndAliasTests: XCTestCase {
@@ -17,16 +18,16 @@ final class ModelRegistryAndAliasTests: XCTestCase {
         XCTAssertTrue(ModelRegistry.isRawAFM(modelId: "apple-intelligence-private-cloud-compute"))
         
         // Non-raw AFM models
-        XCTAssertFalse(ModelRegistry.isRawAFM(modelId: "apple-foundation-omni"))
+        XCTAssertFalse(ModelRegistry.isRawAFM(modelId: "omni"))
         XCTAssertFalse(ModelRegistry.isRawAFM(modelId: "apple-vision-ocr"))
         XCTAssertFalse(ModelRegistry.isRawAFM(modelId: "apple-speech-transcribe"))
     }
     
     func testCustomAliasResolution() {
-        AliasConfiguration.shared.setAlias(alias: "team-analyst", target: "apple-foundation-omni")
+        AliasConfiguration.shared.setAlias(alias: "team-analyst", target: "omni")
         AliasConfiguration.shared.setAlias(alias: "fast-whisper", target: "apple-speech-transcribe")
         
-        XCTAssertEqual(ModelRegistry.resolveCanonicalId("team-analyst"), "apple-foundation-omni")
+        XCTAssertEqual(ModelRegistry.resolveCanonicalId("team-analyst"), "omni")
         XCTAssertEqual(ModelRegistry.resolveCanonicalId("fast-whisper"), "apple-speech-transcribe")
         XCTAssertTrue(ModelRegistry.isSupported(modelId: "team-analyst"))
         
@@ -46,14 +47,14 @@ final class ModelRegistryAndAliasTests: XCTestCase {
         XCTAssertTrue(ModelRegistry.isSupported(modelId: "whisper-1"))
         XCTAssertEqual(ModelRegistry.resolveCanonicalId("whisper-1"), "apple-speech-transcribe")
         XCTAssertEqual(ModelRegistry.resolveCanonicalId("tts-1"), "apple-speech-synthesize")
-        XCTAssertEqual(ModelRegistry.resolveCanonicalId("gpt-4o"), "apple-foundation-omni")
+        XCTAssertEqual(ModelRegistry.resolveCanonicalId("gpt-4o"), "omni")
         XCTAssertEqual(ModelRegistry.resolveCanonicalId("text-embedding-3-small"), "apple-sentence-embedding")
     }
     
     func testOpenAIDTODecoding() throws {
         let json = """
         {
-            "model": "apple-foundation-omni",
+            "model": "omni",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": "Hello on-device AI!"}
@@ -64,7 +65,7 @@ final class ModelRegistryAndAliasTests: XCTestCase {
         """.data(using: .utf8)!
         
         let request = try JSONDecoder().decode(OpenAI.ChatCompletionRequest.self, from: json)
-        XCTAssertEqual(request.model, "apple-foundation-omni")
+        XCTAssertEqual(request.model, "omni")
         XCTAssertEqual(request.messages.count, 2)
         XCTAssertEqual(request.systemInstructions, "You are a helpful assistant.")
         XCTAssertEqual(request.combinedPrompt, "Hello on-device AI!")
@@ -73,7 +74,7 @@ final class ModelRegistryAndAliasTests: XCTestCase {
     func testMultimodalMessageContentDecoding() throws {
         let json = """
         {
-            "model": "apple-foundation-omni",
+            "model": "omni",
             "messages": [
                 {
                     "role": "user",
@@ -89,5 +90,24 @@ final class ModelRegistryAndAliasTests: XCTestCase {
         let request = try JSONDecoder().decode(OpenAI.ChatCompletionRequest.self, from: json)
         XCTAssertEqual(request.messages.count, 1)
         XCTAssertEqual(request.combinedPrompt, "What is in this image?")
+    }
+
+    func testAFMTierUnavailableWhenModelNotAvailable() {
+        let result = AFMTier.detect(availability: .unavailable(.deviceNotEligible), physicalMemory: 16_000_000_000)
+        XCTAssertEqual(result.tier, .unavailable)
+        XCTAssertEqual(result.source, .none)
+    }
+
+    func testAFMTierMatchesSystemVariantWhenAvailable() throws {
+        guard case .available = SystemLanguageModel.default.availability else {
+            throw XCTSkip("Apple Intelligence is not available on this machine")
+        }
+        let result = AFMTier.detect()
+        XCTAssertNotEqual(result.tier, .unavailable)
+        if #available(iOS 27.0, macOS 27.0, visionOS 27.0, *) {
+            let expected: AFMTier = SystemLanguageModel.default.variant == .coreAdvanced3 ? .coreAdvanced : .core3B
+            XCTAssertEqual(result.tier, expected)
+            XCTAssertEqual(result.source, .systemVariant)
+        }
     }
 }

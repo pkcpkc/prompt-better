@@ -8,6 +8,7 @@ public protocol AppleOpenAIClientProtocol: Sendable {
     var embeddings: EmbeddingsClient { get }
     var audio: AudioClient { get }
     var images: ImagesClient { get }
+    var moderations: ModerationsClient { get }
 }
 
 /// In-Process Swift client offering OpenAI-compatible SDK access with zero HTTP overhead.
@@ -21,6 +22,7 @@ public final class AppleOpenAIClient: AppleOpenAIClientProtocol, Sendable {
     public let embeddings: EmbeddingsClient
     public let audio: AudioClient
     public let images: ImagesClient
+    public let moderations: ModerationsClient
     
     public init() {
         self.chat = ChatClient()
@@ -29,5 +31,6 @@ public final class AppleOpenAIClient: AppleOpenAIClientProtocol, Sendable {
         self.embeddings = EmbeddingsClient()
         self.audio = AudioClient()
         self.images = ImagesClient()
+        self.moderations = ModerationsClient()
     }
 }

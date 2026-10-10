@@ -25,14 +25,16 @@ let package = Package(
     dependencies: [
         // 💧 A server-side Swift web framework.
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
-        .package(path: "../../frameworks/AIPromptCore")
+        .package(path: "../../frameworks/AIPromptCore"),
+        .package(path: "../Shared")
     ],
     targets: [
         .executableTarget(
             name: "App",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
-                .product(name: "AIPromptCore", package: "AIPromptCore")
+                .product(name: "AIPromptCore", package: "AIPromptCore"),
+                .product(name: "AIBridgeKit", package: "Shared")
             ],
             swiftSettings: swiftSettings
         ),
