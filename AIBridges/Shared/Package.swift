@@ -11,16 +11,18 @@ let package = Package(
         .library(name: "AIBridgeKit", targets: ["AIBridgeKit"])
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
-        .package(path: "../../frameworks/AIPromptCore")
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0")
     ],
     targets: [
         .target(
             name: "AIBridgeKit",
             dependencies: [
-                .product(name: "Vapor", package: "vapor"),
-                .product(name: "AIPromptCore", package: "AIPromptCore")
+                .product(name: "Vapor", package: "vapor")
             ]
+        ),
+        .testTarget(
+            name: "AIBridgeKitTests",
+            dependencies: ["AIBridgeKit"]
         )
     ]
 )

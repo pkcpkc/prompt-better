@@ -1,36 +1,16 @@
+import AIBridgeKit
 import SwiftUI
 import Vapor
 
 @main
 struct iOSAIBridgeApp: App {
   @StateObject private var serverManager = ServerManager()
-  @State private var showLaunchScreen = true
 
   var body: some Scene {
     WindowGroup {
-      ZStack {
-        if showLaunchScreen {
-          LaunchScreenView()
-            .task {
-              let startTime = Date()
-              // Start the server asynchronously
-              await serverManager.start()
-              
-              // Ensure the premium launch screen remains visible for at least 2.5 seconds
-              let elapsed = Date().timeIntervalSince(startTime)
-              let remaining = max(2.5 - elapsed, 0)
-              if remaining > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
-              }
-              
-              // Switch instantly to the main interface
-              showLaunchScreen = false
-            }
-        } else {
-          ContentView()
-            .environmentObject(serverManager)
-        }
-      }
+      ContentView()
+        .environmentObject(serverManager)
+        .task { await serverManager.start() }
     }
   }
 }
@@ -41,143 +21,78 @@ struct LogEntry: Identifiable, Equatable {
 }
 
 @MainActor
-class LogsManager: ObservableObject {
-  @Published var logs: [LogEntry] = []
-
-  func log(_ message: String) {
-    let timestamp = DateFormatter.localizedString(
-      from: Date(), dateStyle: .none, timeStyle: .medium)
-    logs.append(LogEntry(text: "[\(timestamp)] \(message)"))
-    if logs.count > 100 {
-      logs.removeFirst()
-    }
-  }
-
-  func clear() {
-    logs.removeAll()
-  }
-}
-
-@MainActor
-class ServerManager: ObservableObject {
+final class ServerManager: ObservableObject {
   @Published var isRunning = false
-  @Published var port: Int = 8080
-  @Published var ipAddress: String = "localhost"
-  
-  let logsManager = LogsManager()
+  @Published var logs: [LogEntry] = []
+  @Published private(set) var ipAddress = "localhost"
+  let port = 8080
 
   private var app: Application?
 
+  var baseURL: String { "http://\(ipAddress):\(port)/v1" }
+
   func start() async {
     guard !isRunning else { return }
-
-    // Refresh IP address every time we start
-    self.ipAddress = getLocalIPAddress() ?? "localhost"
+    ipAddress = Self.localIPAddress() ?? "localhost"
 
     do {
-      let env = Environment(name: "development", arguments: ["vapor"])
-      let app = try await Application.make(env)
-      self.app = app
-
-      // Configure server to bind only to the local WiFi interface
+      let app = try await Application.make(Environment(name: "development", arguments: ["vapor"]))
+      // Bind to the local network interface so a Mac on the same network can reach the device.
       app.http.server.configuration.hostname = ipAddress
       app.http.server.configuration.port = port
-
-      // Register middleware for logging
       app.middleware.use(LogMiddleware(serverManager: self))
-
-      // Register routes
       try routes(app)
 
-      // Add a custom logger to capture logs for the UI
-      app.logger.logLevel = .info
-
-      log("Starting server on \(ipAddress):\(String(port))...")
-      
-      // Start the server using the embedded lifecycle
+      log("Starting server on \(ipAddress):\(port)...")
       try await app.startup()
-      
-      self.isRunning = true
-      log("Server is running.")
-      log(ModelRegistry.systemModelDiagnostics)
-
-      await logAvailableModels()
-
+      self.app = app
+      isRunning = true
+      log("Server is running at \(baseURL)")
+      log(BridgeModel.diagnostics)
+      log("Models: \(BridgeModel.allCases.map(\.rawValue).joined(separator: ", "))")
     } catch {
       log("Failed to start server: \(error)")
     }
   }
 
-  func log(_ message: String) {
-    logsManager.log(message)
-  }
-
-  /// Fetches the model list through the running server's own API and logs each model.
-  private func logAvailableModels() async {
-    guard let url = URL(string: "http://\(ipAddress):\(String(port))/v1/models") else { return }
-    do {
-      let (data, _) = try await URLSession.shared.data(from: url)
-      let models = try JSONDecoder().decode(OpenAI.ModelListResponse.self, from: data).data
-      log("Available models (\(models.count)):")
-      for model in models {
-        log("  • \(ModelRegistry.displayName(for: model.id)) [\(model.id)]")
-      }
-    } catch {
-      log("Failed to fetch models: \(error.localizedDescription)")
-    }
-  }
-
   func stop() async {
+    guard let app else { return }
     log("Stopping server...")
+    app.running?.stop()
+    try? await app.asyncShutdown()
+    self.app = nil
     isRunning = false
-    
-    if let app = self.app {
-      // 1. Signal the server loop to stop
-      app.running?.stop()
-      
-      // 2. Wait for the server to actually exit its loop
-      // We use a try? await on the promise's get() if available, 
-      // or we just rely on shutdown() being safer after the signal.
-      // In Vapor 4, app.running?.onStop is a NIO event loop future.
-      // We can ideally wait for it if we have NIO-to-Swift-Concurrency bridging,
-      // but the signal alone already significantly improves the shutdown sequence.
-      
-      // 3. Gracefully shutdown the container
-      try? await app.asyncShutdown()
-      self.app = nil
-    }
-    
     log("Server stopped.")
   }
 
-  private func getLocalIPAddress() -> String? {
+  func log(_ message: String) {
+    let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+    logs.append(LogEntry(text: "[\(timestamp)] \(message)"))
+    if logs.count > 200 {
+      logs.removeFirst()
+    }
+  }
+
+  /// IPv4 address of WiFi/Ethernet (preferred), falling back to IPv6.
+  private static func localIPAddress() -> String? {
     var address: String?
     var ifaddr: UnsafeMutablePointer<ifaddrs>?
-    if getifaddrs(&ifaddr) == 0 {
-      var ptr = ifaddr
-      while ptr != nil {
-        defer { ptr = ptr?.pointee.ifa_next }
+    guard getifaddrs(&ifaddr) == 0 else { return nil }
+    defer { freeifaddrs(ifaddr) }
 
-        guard let interface = ptr?.pointee,
-              let addr = interface.ifa_addr else { continue }
-        let addrFamily = addr.pointee.sa_family
-        if addrFamily == UInt8(AF_INET) || addrFamily == UInt8(AF_INET6) {
-          let name = String(cString: interface.ifa_name)
-          if name == "en0" || name == "en1" || name == "p2p0" {  // WiFi, Ethernet, or AirDrop/Sidecar
-            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            getnameinfo(
-              interface.ifa_addr, socklen_t(interface.ifa_addr.pointee.sa_len), &hostname,
-              socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
-            address = String(cString: hostname)
+    var ptr = ifaddr
+    while let interface = ptr?.pointee {
+      defer { ptr = interface.ifa_next }
+      guard let addr = interface.ifa_addr else { continue }
+      let family = addr.pointee.sa_family
+      guard family == UInt8(AF_INET) || family == UInt8(AF_INET6) else { continue }
+      let name = String(cString: interface.ifa_name)
+      guard name == "en0" || name == "en1" else { continue }
 
-            // Prioritize IPv4 for simplicity in connecting
-            if addrFamily == UInt8(AF_INET) {
-              return address
-            }
-          }
-        }
-      }
-      freeifaddrs(ifaddr)
+      var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+      getnameinfo(addr, socklen_t(addr.pointee.sa_len), &hostname, socklen_t(hostname.count), nil, 0, NI_NUMERICHOST)
+      address = String(cString: hostname)
+      if family == UInt8(AF_INET) { return address }
     }
     return address
   }
@@ -187,23 +102,10 @@ struct LogMiddleware: AsyncMiddleware {
   let serverManager: ServerManager
 
   func respond(to request: Request, chainingTo next: AsyncResponder) async throws -> Response {
-    let method = request.method.rawValue
-    let path = request.url.path
-
-    // Log the incoming request
-    await serverManager.log("\(method) \(path)")
-
-    do {
-      let response = try await next.respond(to: request)
-      let status = response.status.code
-
-      // Log the outgoing response
-      await serverManager.log("\(status) \(method) \(path)")
-
-      return response
-    } catch {
-      await serverManager.log("⚠️ \(error.localizedDescription)")
-      throw error
-    }
+    let line = "\(request.method.rawValue) \(request.url.path)"
+    await serverManager.log(line)
+    let response = try await next.respond(to: request)
+    await serverManager.log("\(response.status.code) \(line)")
+    return response
   }
 }

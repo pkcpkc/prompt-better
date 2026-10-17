@@ -28,23 +28,18 @@ To support resource-constrained target devices (like local 3B–8B weights), the
 
 ### iOS and macOS On-Device Foundation Models
 
-`prompt-better` integrates natively with Apple's on-device **FoundationModels** (iOS 26+ / macOS 26+). Apple's capabilities are exposed under canonical model IDs through two paths that share one engine:
+`prompt-better` optimizes prompts against Apple's on-device **FoundationModels** (iOS 26+ / macOS 26+). Minimal [macOS and iOS Vapor bridges](AIBridges) serve the on-device language model as an OpenAI-compatible `/v1/chat/completions` endpoint, which the Python optimizer uses as the student.
 
-- **Swift SDK**: `AppleOpenAIClient` from [AIPromptCore](frameworks/AIPromptCore), in-process and typed.
-- **OpenAI-compatible HTTP**: [macOS and iOS Vapor bridges](AIBridges) that the Python optimizer uses as the student endpoint.
-
-Covered models: on-device language models and Private Cloud Compute, multimodal chat with RAG, Vision OCR, PDF extraction, translation, speech-to-text and text-to-speech, sentence/word/image embeddings, hybrid local search, and image generation. See the [Apple model catalog](docs/APPLE_MODELS.md).
+Swift code emitted by `generate` conforms to `GenerableWithPrompt` from [AIPromptCore](frameworks/AIPromptCore), a small Swift framework for running them on the on-device model.
 
 ```mermaid
 flowchart LR
     spec["prompt.json + dataset"] --> cli["prompt-better CLI (DSPy)"]
     cli -- "teacher: cloud LLM" --> teacher["e.g. GPT-4o"]
-    cli -- "student: HTTP /v1/*" --> bridge["Vapor bridge (macOS / iOS)"]
-    bridge --> core["AIPromptCore"]
-    app["Your app"] -- "Swift SDK" --> core
-    core --> apple["Apple on-device models + PCC"]
+    cli -- "student: HTTP /v1/chat/completions" --> bridge["Vapor bridge (macOS / iOS)"]
+    bridge --> apple["Apple on-device model"]
     cli --> out["optimized-prompt.json -> Swift @Generable"]
-    out --> app
+    out --> app["Your app + AIPromptCore"]
 ```
 
 ---
@@ -137,14 +132,12 @@ The optimization output is written to:
 
 | Topic | Doc |
 | :--- | :--- |
-| Apple models: full catalog, Swift SDK and OpenAI API usage, aliases | [docs/APPLE_MODELS.md](docs/APPLE_MODELS.md) |
-| Bridges and AIPromptCore setup (macOS, iOS, XCFramework, codegen) | [docs/APPLE_BRIDGES.md](docs/APPLE_BRIDGES.md) |
+| Bridges (macOS, iOS), model IDs, Swift codegen | [docs/APPLE_BRIDGES.md](docs/APPLE_BRIDGES.md) |
 | `evaluate`: scoring formulas, custom evaluators, flow | [docs/EVALUATE.md](docs/EVALUATE.md) |
 | `optimize`: workflow, optimizers (`predict`, MIPROv2, GEPA), iOS guidance | [docs/OPTIMIZE.md](docs/OPTIMIZE.md) |
 | JSON specs: `prompt.json`, dataset cases, golden truth | [docs/SCHEMAS.md](docs/SCHEMAS.md) |
 | CLI commands, environment variables, presets, Gradle, books | [docs/REFERENCE.md](docs/REFERENCE.md) |
 | Bridge HTTP endpoints and device testing | [AIBridges/README.md](AIBridges/README.md) |
-| AIPromptCore API, RAG, Generable prompts | [frameworks/AIPromptCore/docs](frameworks/AIPromptCore/docs) |
 | Gradle plugin | [contrib/gradle](contrib/gradle/README.md) |
 
 ## 4. Commands at a Glance

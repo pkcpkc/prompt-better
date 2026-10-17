@@ -2,223 +2,64 @@ import SwiftUI
 
 struct ContentView: View {
   @EnvironmentObject var serverManager: ServerManager
-  @State private var showChat = false
-  @State private var showSettings = false
 
   var body: some View {
-    #if os(macOS)
-    // On macOS the chat replaces the dashboard in the window; a sheet would be a small floating panel.
-    if showChat {
-      ChatRootView(onClose: { showChat = false })
-        .environmentObject(serverManager)
-    } else {
-      dashboard
-    }
-    #else
-    dashboard
-      .fullScreenCover(isPresented: $showChat) {
-        ChatRootView(onClose: { showChat = false })
-          .environmentObject(serverManager)
-      }
-    #endif
-  }
-
-  private var dashboard: some View {
-    NavigationStack {
-      VStack(spacing: 20) {
-        // Custom Header Row
-        HStack {
-            Text("AI Bridge")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-            
-            Spacer()
-            
-            Button(action: {
-                showSettings = true
-            }) {
-                Image(systemName: "gearshape.fill")
-                    .imageScale(.large)
-                    .foregroundColor(.secondary)
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 8)
-            
-            Button(action: {
-                if serverManager.isRunning {
-                    Task {
-                        await serverManager.stop()
-                    }
-                } else {
-                    Task {
-                        await serverManager.start()
-                    }
-                }
-            }) {
-                Text(serverManager.isRunning ? "Stop" : "Start")
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(serverManager.isRunning ? .red : .green)
-        }
-        .padding(.horizontal)
-        .padding(.top)
-
-        statusHeader
-        
-
-
-        LogsView(logsManager: serverManager.logsManager)
-
-        // Bottom button actions row (destructive left, primary right)
-        HStack {
-          Button(action: {
-            serverManager.logsManager.clear()
-          }) {
-            HStack(spacing: 8) {
-              Image(systemName: "trash.fill")
-              Text("Clear Logs")
-                .fontWeight(.bold)
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.red)
-            .cornerRadius(24)
-            .shadow(color: Color.red.opacity(0.3), radius: 6, x: 0, y: 4)
-          }
-          .buttonStyle(.plain)
-          .padding(.leading, 20)
-
-          Spacer()
-
-          Button(action: {
-            showChat = true
-          }) {
-            HStack(spacing: 8) {
-              Image(systemName: "bubble.left.and.bubble.right.fill")
-              Text("Chat")
-                .fontWeight(.bold)
-            }
-            .foregroundColor(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.green)
-            .cornerRadius(24)
-            .shadow(color: Color.green.opacity(0.3), radius: 6, x: 0, y: 4)
-          }
-          .buttonStyle(.plain)
-          .padding(.trailing, 20)
-        }
-        .padding(.bottom, 20)
-      }
-#if os(iOS)
-      .toolbar(.hidden, for: .navigationBar)
-#endif
-      .sheet(isPresented: $showSettings) {
-        NavigationStack {
-          SettingsView()
-            .toolbar {
-              ToolbarItem(placement: .cancellationAction) {
-                Button("Done") { showSettings = false }
-              }
-            }
-        }
-      }
-    }
-  }
-
-  private var statusHeader: some View {
-    HStack {
-      VStack(alignment: .leading) {
-        HStack {
-          Circle()
-            .fill(serverManager.isRunning ? Color.green : Color.red)
-            .frame(width: 10, height: 10)
-          Text(serverManager.isRunning ? "Running" : "Stopped")
-            .fontWeight(.bold)
-        }
-
-        if serverManager.isRunning {
-          Link(destination: URL(string: "http://\(serverManager.ipAddress):\(String(serverManager.port))/v1/models")!) {
-            Text("http://\(serverManager.ipAddress):\(String(serverManager.port))/v1/models")
-              .underline()
-              .font(.subheadline)
-              .foregroundColor(.blue)
-          }
-        } else {
-          Text("Server offline")
-            .font(.subheadline)
-            .foregroundColor(.secondary)
-        }
-      }
-      Spacer()
-    }
-    .padding()
-    .background(Color.gray.opacity(0.05))
-    .cornerRadius(12)
-    .shadow(radius: 2)
-    .padding()
-  }
-}
-
-struct LogsView: View {
-  @ObservedObject var logsManager: LogsManager
-
-  var body: some View {
-    VStack(alignment: .leading) {
+    VStack(alignment: .leading, spacing: 16) {
       HStack {
-        Text("Logs")
-          .font(.headline)
+        Text("AI Bridge")
+          .font(.largeTitle)
+          .fontWeight(.bold)
         Spacer()
-        Button(action: copyAllLogs) {
-          Label("Copy All", systemImage: "doc.on.doc")
-            .font(.caption)
+        Button(serverManager.isRunning ? "Stop" : "Start") {
+          Task {
+            if serverManager.isRunning {
+              await serverManager.stop()
+            } else {
+              await serverManager.start()
+            }
+          }
         }
-        .buttonStyle(.borderless)
-        .disabled(logsManager.logs.isEmpty)
+        .fontWeight(.bold)
+        .buttonStyle(.borderedProminent)
+        .tint(serverManager.isRunning ? .red : .green)
       }
-      .padding(.horizontal)
 
+      HStack {
+        Circle()
+          .fill(serverManager.isRunning ? Color.green : Color.red)
+          .frame(width: 10, height: 10)
+        Text(serverManager.isRunning ? "Running" : "Stopped")
+          .fontWeight(.bold)
+      }
+
+      if serverManager.isRunning {
+        // Use this as the student `base_url` in prompt-better.json.
+        Text(serverManager.baseURL)
+          .font(.system(.subheadline, design: .monospaced))
+          .textSelection(.enabled)
+      }
+
+      Text("Logs")
+        .font(.headline)
       ScrollViewReader { proxy in
         ScrollView {
-          LazyVStack(alignment: .leading, spacing: 5) {
-            ForEach(logsManager.logs) { log in
-              Text(log.text)
+          LazyVStack(alignment: .leading, spacing: 4) {
+            ForEach(serverManager.logs) { entry in
+              Text(entry.text)
                 .font(.system(.caption, design: .monospaced))
-                .padding(.horizontal)
-                .id(log.id)
+                .id(entry.id)
             }
           }
-          // Read-only: log lines can be selected and copied, never edited or pasted into
-          .textSelection(.enabled)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(8)
         }
-        .onChange(of: logsManager.logs) { oldValue, newValue in
-          if let last = newValue.last {
-            DispatchQueue.main.async {
-              withAnimation {
-                proxy.scrollTo(last.id)
-              }
-            }
-          }
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
+        .onChange(of: serverManager.logs.last?.id) { _, last in
+          if let last { proxy.scrollTo(last) }
         }
       }
-      .background(Color.gray.opacity(0.1))
-      .cornerRadius(8)
-      .padding(.horizontal)
     }
-  }
-
-  private func copyAllLogs() {
-    let text = logsManager.logs.map(\.text).joined(separator: "\n")
-    #if os(macOS)
-    NSPasteboard.general.clearContents()
-    NSPasteboard.general.setString(text, forType: .string)
-    #else
-    UIPasteboard.general.string = text
-    #endif
+    .padding()
   }
 }
